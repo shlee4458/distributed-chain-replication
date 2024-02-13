@@ -1,0 +1,10 @@
+./server [ port #] [ unique ID ] [# peers ] ( repeat [ ID ] [ IP ] [ port #])
+./server 12345 0 2 1 22.22.22.22 12345 2 33.33.33.33 12345
+
+./client 123.456.789.123 12345 1 128 3
+./client ip 12345 1 128 3
+
+
+# CLA before change
+./server 12345 1
+./client 127.0.0.1 12345 55 128 1
