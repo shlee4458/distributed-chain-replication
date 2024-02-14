@@ -21,7 +21,7 @@ public:
 	int ShipLaptop(LaptopInfo info);
 	int ReturnRecord(std::unique_ptr<CustomerRecord> record);
 	void ConnectWithBackups();
-	void SendReplicationRequest(char* buffer, int size);
+	int SendReplicationRequest(char* buffer, int size);
 };
 
 #endif // end of #ifndef __SERVER_STUB_H__

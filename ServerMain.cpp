@@ -39,7 +39,7 @@ int main(int argc, char *argv[]) {
 		// create a node and add the node as the neighbor of the current server
 		std::unique_ptr<ServerNode> node = std::make_unique<ServerNode>();
 		node->id = atoi(argv[i]);
-		node->ip = atoi(argv[i + 1]);
+		node->ip = argv[i + 1];
 		node->port = atoi(argv[i + 2]);
 
 		metadata->AddNeighbors(std::move(node));

@@ -42,9 +42,17 @@ void ServerStub::ConnectWithBackups() {
 	metadata->ConnectWithNeighbors(primary_sockets);
 }
 
-void ServerStub::SendReplicationRequest() {
+int ServerStub::SendReplicationRequest(char* buffer, int size) {
 	// iterate over all the neighbor nodes, and send the replication request
-
-
+	char buffer[32];
+	for (auto const& socket : primary_sockets) {
+		if (socket->Send(buffer, size, 0)) {
+			// receive the response from the backup server; expect htonl of single 4 byte int
+			// if message not received exit with 0
+			if (!socket->Recv(buffer, sizeof(int), 0)) {
+				return 0;
+			}
+		}
+	}
+	return 1; // upon successfully receiving all the messages, return 1
 }
-
