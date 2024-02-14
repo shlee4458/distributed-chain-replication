@@ -5,9 +5,8 @@
 
 ServerStub::ServerStub() {}
 
-void ServerStub::Init(std::unique_ptr<ServerSocket> socket, std::shared_ptr<ServerMetadata> metadata) {
+void ServerStub::Init(std::unique_ptr<ServerSocket> socket) {
 	this->socket = std::move(socket);
-	this->metadata = metadata;
 }
 
 CustomerRequest ServerStub::ReceiveRequest() {
@@ -33,7 +32,7 @@ int ServerStub::ReturnRecord(std::unique_ptr<CustomerRecord> record) {
 
 // establish connection with the backup servers
 	// open connection with all the neighboring servers as the client
-void ServerStub::ConnectWithBackups() {
+void ServerStub::ConnectWithBackups(std::shared_ptr<ServerMetadata> metadata) {
 
 	// if there is a socket connected with the primary server, close the connection
 	if (metadata->WasBackup()) {
@@ -73,14 +72,19 @@ int ServerStub::IdentifySender() {
 	// return 1 if it is pfa, 2 if it is customer
 	char buffer[4];
 	Identifier identifier;
-	if (!socket->Recv(buffer, sizeof(int), 0)) {
+	if (socket->Recv(buffer, sizeof(int), 0)) {
 		identifier.Unmarshal(buffer);
 		return identifier.GetIdentifier();
 	}
 	return 0; // identification failed
 }
 
-
-void ServerStub::ReceiveReplication() {
-	
+ReplicationRequest ServerStub::ReceiveReplication() {
+	char buffer[32];
+	ReplicationRequest request;
+	int size = request.Size();
+	if (socket->Recv(buffer, size, 0)) {
+		request.Unmarshal(buffer);
+	}
+	return request;
 }

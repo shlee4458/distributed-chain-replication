@@ -102,4 +102,26 @@ private:
 	int identifier;
 };
 
+class ReplicationRequest {
+public:
+	ReplicationRequest();
+	ReplicationRequest(std::shared_ptr<ServerMetadata> metadata, MapOp op);
+	int Size();
+
+	int GetLastIdx();
+	int GetCommitedIdx();
+	int GetPrimaryId();
+	int GetOpCode();
+	int GetArg1();
+	int GetArg2();
+
+	void Marshal(char *buffer);
+	void Unmarshal(char *buffer);
+private:
+    int last_idx;
+    int committed_idx;
+    int primary_id;
+    MapOp op;
+};
+
 #endif // #ifndef __MESSAGES_H__

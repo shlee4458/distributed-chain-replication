@@ -14,10 +14,12 @@ struct ServerNode {
     int port;
 };
 
+
+
 class ServerMetadata {
 private:
     int last_index;
-    int committed_index;
+    int committed_idx;
     int primary_id;
     int factory_id;
     std::vector<std::unique_ptr<ServerNode>> neighbors;
@@ -32,13 +34,12 @@ public:
     std::vector<std::unique_ptr<ServerNode>> GetNeighbors();
 
     void SetFactoryId(int id);
+    void SetPrimaryId(int id);
     void UpdateLastIndex(int idx);
     void UpdateCommitedIndex(int idx);
 
     bool WasBackup();
     bool IsPrimary();
-
-    int Marshal(char *buffer, MapOp op);
 
     void AddNeighbors(std::unique_ptr<ServerNode> node);
     void ConnectWithNeighbors(std::vector<std::unique_ptr<ClientSocket>> primary_sockets);

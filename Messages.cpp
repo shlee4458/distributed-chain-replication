@@ -1,8 +1,9 @@
 #include <cstring>
 #include <iostream>
-
 #include <arpa/inet.h>
+
 #include "Messages.h"
+#include "ServerMetadata.h"
 
 /**
  * Customer Request
@@ -238,4 +239,89 @@ void Identifier::Unmarshal(char *buffer) {
 	int net_identifer;
 	memcpy(&net_identifer, buffer, sizeof(net_identifer));
 	identifier = ntohl(net_identifer);
+}
+
+/**
+ * Replication Message
+*/
+
+ReplicationRequest::ReplicationRequest(std::shared_ptr<ServerMetadata> metadata, MapOp op) {
+    this->last_idx = metadata->GetLastIndex();
+    this->committed_idx = metadata->GetCommittedIndex();
+    this->primary_id = metadata->GetPrimaryId();
+    this->op = op;
+}
+
+int ReplicationRequest::Size() {
+	return sizeof(last_idx) + sizeof(committed_idx) + sizeof(primary_id) + sizeof(op);
+}
+
+int ReplicationRequest::GetLastIdx() {
+	return last_idx;
+}
+int ReplicationRequest::GetCommitedIdx() {
+	return committed_idx;
+}
+int ReplicationRequest::GetPrimaryId() {
+	return primary_id;
+}
+int ReplicationRequest::GetOpCode() {
+	return op.opcode;
+}
+int ReplicationRequest::GetArg1() {
+	return op.arg1;
+}
+int ReplicationRequest::GetArg2() {
+	return op.arg2;
+}
+
+void ReplicationRequest::Marshal(char *buffer) {
+	int net_primary_id = htonl(primary_id);
+	int net_last_idx = htonl(last_idx);
+    int net_committed_idx = htonl(committed_idx);
+    int net_opcode = htonl(op.opcode);
+    int net_arg1 = htonl(op.arg1);
+    int net_arg2 = htonl(op.arg2);
+
+	int offset = 0;
+	memcpy(buffer + offset, &net_primary_id, sizeof(net_primary_id));
+	offset += sizeof(net_primary_id);
+	memcpy(buffer + offset, &net_last_idx, sizeof(net_last_idx));
+	offset += sizeof(net_last_idx);
+	memcpy(buffer + offset, &net_committed_idx, sizeof(net_committed_idx));
+	offset += sizeof(net_committed_idx);
+	memcpy(buffer + offset, &net_opcode, sizeof(net_opcode));
+	offset += sizeof(net_opcode);
+	memcpy(buffer + offset, &net_arg1, sizeof(net_arg1));
+    offset += sizeof(net_arg1);
+	memcpy(buffer + offset, &net_arg2, sizeof(net_arg2));
+}
+
+void ReplicationRequest::Unmarshal(char *buffer) {
+	int net_primary_id;
+	int net_last_idx;
+    int net_committed_idx;
+    int net_opcode;
+    int net_arg1;
+    int net_arg2;
+	int offset = 0;
+
+	memcpy(&net_primary_id, buffer + offset, sizeof(net_primary_id));
+	offset += sizeof(net_primary_id);
+	memcpy(&net_last_idx, buffer + offset, sizeof(net_last_idx));
+	offset += sizeof(net_last_idx);
+	memcpy(&net_committed_idx, buffer + offset, sizeof(net_committed_idx));
+	offset += sizeof(net_committed_idx);
+	memcpy(&net_opcode, buffer + offset, sizeof(net_opcode));
+	offset += sizeof(net_opcode);
+	memcpy(&net_arg1, buffer + offset, sizeof(net_arg1));
+	offset += sizeof(net_arg1);
+	memcpy(&net_arg2, buffer + offset, sizeof(net_arg2));				
+
+	primary_id = ntohl(net_primary_id);
+	last_idx = ntohl(net_last_idx);
+    committed_idx = ntohl(net_committed_idx); 
+    op.opcode = ntohl(net_opcode);
+    op.arg1 = ntohl(net_arg1);
+    op.arg2 = ntohl(net_arg2);
 }

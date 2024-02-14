@@ -14,6 +14,7 @@ public:
 	int Init(std::string ip, int port);
 	LaptopInfo Order(CustomerRequest request);
 	CustomerRecord ReadRecord(CustomerRequest request);
+	int SendIdentifier(Identifier identifier);
 };
 
 
