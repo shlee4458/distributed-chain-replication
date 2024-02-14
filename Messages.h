@@ -78,6 +78,8 @@ public:
 	void Marshal(char *buffer);
 	void Unmarshal(char *buffer);
 
+	bool IsValid();
+
 	void Print();
 
 private:

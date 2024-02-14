@@ -31,9 +31,10 @@ ThreadBody(std::string ip, int port, int id, int requests, int type) {
 				// change the request record to 2
 				request.SetRequest(i, -1, 2);
 				record = stub.ReadRecord(request);
-				if (request_type == 3) {
+				if (request_type == 3 && record.IsValid()) {
 					record.Print();
 				}
+				break;
 			default:
 				break;
 		}

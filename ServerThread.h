@@ -24,13 +24,14 @@ struct MapOp {
 
 class LaptopFactory {
 private:
-	
+	ServerStub stub;
 	std::queue<std::unique_ptr<AdminRequest>> erq;
 	std::mutex erq_lock;
 	std::mutex log_lock;
 	std::condition_variable erq_cv;
 	std::shared_ptr<std::map<int, int>> customer_record;
 	std::shared_ptr<std::vector<MapOp>> smr_log;
+	std::shared_ptr<ServerMetadata> metadata;
 
 	LaptopInfo GetLaptopInfo(CustomerRequest order, int engineer_id);
 	LaptopInfo CreateLaptop(CustomerRequest order, int engineer_id);
@@ -41,7 +42,8 @@ public:
 	void EngineerThread(std::unique_ptr<ServerSocket> socket, 
 						int id, 
 						std::shared_ptr<std::map<int, int>> record,
-						std::shared_ptr<std::vector<MapOp>> smr);
+						std::shared_ptr<std::vector<MapOp>> smr,
+						std::shared_ptr<ServerMetadata> metadata);
 	void AdminThread(int id);
 };
 

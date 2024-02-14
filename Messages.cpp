@@ -172,6 +172,10 @@ CustomerRecord::CustomerRecord() {
 	last_order = -1;
 }
 
+bool CustomerRecord::IsValid() {
+	return last_order != -1;
+}
+
 
 void CustomerRecord::SetRecord(int id, int ordnum) {
 	customer_id = id;

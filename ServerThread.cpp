@@ -10,7 +10,7 @@ GetLaptopInfo(CustomerRequest request, int engineer_id) {
 	LaptopInfo laptop;
 	laptop.CopyRequest(request);
 	laptop.SetEngineerId(engineer_id);
-	laptop.SetAdminId(-1); // left as -1, if it is a read request
+	laptop.SetAdminId(-1);
 	return laptop;
 }
 
@@ -50,7 +50,21 @@ UpdateRecord(int customer_id, int order_num) {
 		std::unique_lock<std::mutex> ul(log_lock);
 		smr_log->push_back(op);
 
-		// TODO: check if all the following server has updated the log
+		// update the last index with the
+		int prev_last_idx = metadata->GetLastIndex();
+		int prev_commited_idx = metadata->GetCommittedIndex();
+		metadata->UpdateLastIndex(prev_last_idx + 1);
+
+		// marshal the metadata(factoryid, committed_idx, last_idx, MapOp)
+		char buffer[32];
+		int size = metadata->Marshal(buffer, op);
+		if (!stub.SendReplicationRequest(buffer, size)) {
+			// TODO: error handling - have not received from one of the message from the backup
+
+		}
+
+		// update the commited index
+		metadata->UpdateCommitedIndex(prev_commited_idx + 1);
 
 		// update the record
 		(*customer_record)[customer_id] = order_num;
@@ -65,7 +79,6 @@ ReadRecord(int customer_id) {
 		std::unique_lock<std::mutex> ul(log_lock);
 		auto it = customer_record->find(customer_id);
 		if (it != customer_record->end()) { // found the key, return the value
-			int order_num = it->second;
 			return (*customer_record)[customer_id];
 		} else { // key not found, return -1
 			return -1; 
@@ -77,22 +90,23 @@ void LaptopFactory::
 EngineerThread(std::unique_ptr<ServerSocket> socket, 
 				int id, 
 				std::shared_ptr<std::map<int, int>> record,
-				std::shared_ptr<std::vector<MapOp>> smr) {
+				std::shared_ptr<std::vector<MapOp>> smr,
+				std::shared_ptr<ServerMetadata> metadata) {
 
 	// set the private variable
+	this->metadata = metadata;
 	customer_record = record;
 	smr_log = smr;
 
 	int engineer_id = id;
 	int request_type, customer_id, order_num;
+	int factory_id, primary_id;
 
 	CustomerRequest request;
 	std::unique_ptr<CustomerRecord> entry;
 	LaptopInfo laptop;
 
-	ServerStub stub;
-
-	stub.Init(std::move(socket));
+	stub.Init(std::move(socket), metadata);
 
 	while (true) {
 		request = stub.ReceiveRequest();
@@ -101,15 +115,18 @@ EngineerThread(std::unique_ptr<ServerSocket> socket,
 		}
 		request_type = request.GetRequestType();
 		switch (request_type) {
-			case 1:
-			// create the laptop, allow admin to process the order by
-				// first updating the smr_log with mapop
-				// and executing the MapOp
-				// send the returned laptop to the client
+			case 1: // PFA logic (admin thread)
+				// if the current node is not the primary node, 
+					// set the current node as the primary
+					// and broadcast to the neighbor nodes
+				if (!metadata->IsPrimary()) {
+					stub.ConnectWithBackups();
+				}
+
 				laptop = CreateLaptop(request, engineer_id);
 				stub.ShipLaptop(laptop);
 				break;
-			case 2:
+			case 2: // IFA logic (engineer thread)
 			// read the record, and send the record
 				laptop = GetLaptopInfo(request, engineer_id);
 				customer_id = laptop.GetCustomerId();
@@ -152,10 +169,9 @@ void LaptopFactory::AdminThread(int id) {
 		customer_id = req->laptop.GetCustomerId();
 		order_num = req->laptop.GetOrderNumber();
 
-
 		// update the record and set the adminid
 		req->laptop.SetAdminId(id);
-		req->prom.set_value(req->laptop);	
+		req->prom.set_value(req->laptop);
 		UpdateRecord(customer_id, order_num); 
 	}
 }
