@@ -40,7 +40,7 @@ void ServerStub::ConnectWithBackups(std::shared_ptr<ServerMetadata> metadata) {
 	}
 
 	// populate sockets vector by connecting with the neighbors
-	metadata->ConnectWithNeighbors(primary_sockets);
+	// metadata->ConnectWithNeighbors(primary_sockets);
 }
 
 int ServerStub::SendReplicationRequest(char* buffer, int size) {

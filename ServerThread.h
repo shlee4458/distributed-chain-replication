@@ -51,7 +51,11 @@ private:
 	void CustomerHandler(int engineer_id);
 
 	int ReadRecord(int customer_id);
-	void UpdateRecord(int customer_id, int order_num);
+	void PrimaryMaintainLog(int customer_id, int order_num);
+	void IdleMaintainLog(int customer_id, int order_num, int req_last, int req_committed);
+
+	void ExecuteLog(int idx);
+
 public:
 	void EngineerThread(std::unique_ptr<ServerSocket> socket, 
 						int engieer_id, 

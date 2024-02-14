@@ -44,10 +44,9 @@ CreateLaptop(CustomerRequest request, int engineer_id) {
 }
 
 void LaptopFactory::
-UpdateRecord(int customer_id, int order_num) {
-	int size;
+PrimaryMaintainLog(int customer_id, int order_num) {
 
-	// create an instance of the MapOp
+	int size;
 	MapOp op;
 	op.opcode = 1;
 	op.arg1 = customer_id;
@@ -55,13 +54,16 @@ UpdateRecord(int customer_id, int order_num) {
 
 	// obtain a lock, and move the op to the vector
 	{
+		// if it changed to primary from idle server
 		std::unique_lock<std::mutex> ul(log_lock);
-		smr_log->push_back(op);
-
-		// update the last index with the
 		int prev_last_idx = metadata->GetLastIndex();
 		int prev_commited_idx = metadata->GetCommittedIndex();
-		metadata->UpdateLastIndex(prev_last_idx + 1);
+
+		if (prev_last_idx != prev_commited_idx) {
+			// execute the log a the prev_last_idx before appending to the log
+			metadata->ExecuteLog(prev_last_idx);
+		}
+		metadata->AppendLog(op);
 
 		// marshal the metadata(factoryid, committed_idx, last_idx, MapOp)
 		char buffer[32];
@@ -73,15 +75,30 @@ UpdateRecord(int customer_id, int order_num) {
 			// TODO: error handling - have not received from one of the message from the backup
 
 		}
-
-		// update the commited index
-		metadata->UpdateCommitedIndex(prev_commited_idx + 1);
-
-		// update the record
-		(*customer_record)[customer_id] = order_num;
+		// execute log at the last index, and update the committed_index
+		metadata->ExecuteLog(metadata->GetLastIndex());
 	}
 	return;
 }
+
+void LaptopFactory::
+IdleMaintainLog(int customer_id, int order_num, int req_last, int req_committed) {
+	int size;
+	MapOp op;
+	op.opcode = 1;
+	op.arg1 = customer_id;
+	op.arg2 = order_num;
+	{
+		std::unique_lock<std::mutex> ul(log_lock);
+
+		// append the new log and update the last_index :: TODO: ASK#####################################
+		metadata->AppendLog(op);
+
+		// execute the log at the req.committed index 
+		metadata->ExecuteLog(req_committed);
+	}
+}
+
 
 int LaptopFactory::
 ReadRecord(int customer_id) {
@@ -132,6 +149,7 @@ EngineerThread(std::unique_ptr<ServerSocket> socket,
 }
 
 bool LaptopFactory::PfaHandler() {
+
 	ReplicationRequest request;
 	bool success;
 	request = stub.ReceiveReplication();
@@ -205,11 +223,6 @@ void LaptopFactory::PrimaryAdminThread(int id) {
 
 		auto req = std::move(erq.front());
 		erq.pop();
-
-		// based on the request obtained from the erq
-			// update the record with the MapOp
-			// make sure to lock the access to the log
-
 		ul.unlock();
 
 		// get the customer_id and order_num from the request
@@ -219,7 +232,7 @@ void LaptopFactory::PrimaryAdminThread(int id) {
 		// update the record and set the adminid
 		req->laptop.SetAdminId(id);
 		req->prom.set_value(req->laptop);
-		UpdateRecord(customer_id, order_num); 
+		PrimaryMaintainLog(customer_id, order_num); 
 	}
 }
 
@@ -238,11 +251,6 @@ void LaptopFactory::IdleAdminThread(int id) {
 
 		auto request = std::move(req.front());
 		req.pop();
-
-		// based on the request obtained from the erq
-			// update the record with the MapOp
-			// make sure to lock the access to the log
-
 		rl.unlock();
 
 		// get the information
@@ -254,11 +262,7 @@ void LaptopFactory::IdleAdminThread(int id) {
 
 		// update the metadata; commited index, last index
 		metadata->SetPrimaryId(primary_id);
-		metadata->UpdateCommitedIndex(committed_idx); // TODO: update accordingly
-		metadata->UpdateLastIndex(last_idx);
-
-		// add to the smr
-
-		UpdateRecord(customer_id, order_num); 
+		IdleMaintainLog(customer_id, order_num, last_idx, committed_idx);
+		request->repl_prom.set_value(true);
 	}
 }

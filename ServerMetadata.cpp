@@ -47,6 +47,25 @@ void ServerMetadata::UpdateCommitedIndex(int idx) {
     committed_idx = idx;
 }
 
+void ServerMetadata::AppendLog(MapOp op) {
+    smr_log.push_back(op);
+    last_index++;
+}
+
+MapOp ServerMetadata::GetOp(int idx) {
+    return smr_log[idx];
+}
+
+void ServerMetadata::ExecuteLog(int idx) {
+    MapOp op = GetOp(idx);
+    UpdateRecord(op.arg1, op.arg2);
+    committed_idx++;
+}
+
+void ServerMetadata::UpdateRecord(int customer_id, int order_num) {
+    customer_record[customer_id] = order_num;
+}
+
 bool ServerMetadata::WasBackup() {
     return primary_id != -1;
 }
@@ -70,5 +89,4 @@ void ServerMetadata::ConnectWithNeighbors(std::vector<std::unique_ptr<ClientSock
 		socket->Init(ip, port);
 		primary_sockets.push_back(std::move(socket));
 	}
-    return;
 }

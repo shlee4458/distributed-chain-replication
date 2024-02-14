@@ -14,8 +14,6 @@ struct ServerNode {
     int port;
 };
 
-
-
 class ServerMetadata {
 private:
     int last_index;
@@ -23,6 +21,8 @@ private:
     int primary_id;
     int factory_id;
     std::vector<std::unique_ptr<ServerNode>> neighbors;
+    std::map<int, int> customer_record;
+    std::vector<MapOp> smr_log;
 
 public:
     ServerMetadata();
@@ -37,6 +37,10 @@ public:
     void SetPrimaryId(int id);
     void UpdateLastIndex(int idx);
     void UpdateCommitedIndex(int idx);
+    void AppendLog(MapOp op);
+    MapOp GetOp(int idx);
+    void UpdateRecord(int customer_id, int order_num);
+    void ExecuteLog(int idx);
 
     bool WasBackup();
     bool IsPrimary();
