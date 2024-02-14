@@ -22,6 +22,8 @@ public:
 	int ReturnRecord(std::unique_ptr<CustomerRecord> record);
 	void ConnectWithBackups();
 	int SendReplicationRequest(char* buffer, int size);
+	void ReceiveReplication();
+	int IdentifySender();
 };
 
 #endif // end of #ifndef __SERVER_STUB_H__

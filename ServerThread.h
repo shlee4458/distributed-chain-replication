@@ -7,6 +7,7 @@
 #include <queue>
 #include <vector>
 #include <thread>
+#include <map>
 
 #include "Messages.h"
 #include "ServerSocket.h"
@@ -37,14 +38,15 @@ private:
 	LaptopInfo CreateLaptop(CustomerRequest order, int engineer_id);
 
 	int ReadRecord(int customer_id);
-	void UpdateRecord(int customer_id, int order_num);
+	void PrimaryUpdateRecord(int customer_id, int order_num);
 public:
 	void EngineerThread(std::unique_ptr<ServerSocket> socket, 
 						int id, 
 						std::shared_ptr<std::map<int, int>> record,
 						std::shared_ptr<std::vector<MapOp>> smr,
 						std::shared_ptr<ServerMetadata> metadata);
-	void AdminThread(int id);
+	void PrimaryAdminThread(int id);
+	void IdleAdminThread(int id);
 };
 
 #endif // end of #ifndef __SERVERTHREAD_H__

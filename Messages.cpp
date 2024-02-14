@@ -213,3 +213,29 @@ void CustomerRecord::Print() {
 	std::cout << "Last Order num: "<< last_order << std::endl;
 }
 
+/**
+ * Identifier 
+*/
+
+void Identifier::SetIdentifier(int identifier) {
+	this->identifier = identifier;
+}
+
+int Identifier::Size() {
+	return sizeof(identifier);
+}
+
+int Identifier::GetIdentifier() {
+	return identifier;
+}
+
+void Identifier::Marshal(char *buffer) {
+	int net_identifer = htonl(identifier);
+	memcpy(buffer, &net_identifer, sizeof(net_identifer));
+}
+
+void Identifier::Unmarshal(char *buffer) {
+	int net_identifer;
+	memcpy(&net_identifer, buffer, sizeof(net_identifer));
+	identifier = ntohl(net_identifer);
+}

@@ -45,10 +45,15 @@ int main(int argc, char *argv[]) {
 		metadata->AddNeighbors(std::move(node));
 	}
 
-	// create the server admin thread
-	std::thread expert_thread(&LaptopFactory::AdminThread, 
+	// create the primary admin thread
+	std::thread pfa_thread(&LaptopFactory::PrimaryAdminThread, 
 			&factory, engineer_cnt++, metadata);
-	thread_vector.push_back(std::move(expert_thread));
+	thread_vector.push_back(std::move(pfa_thread));
+
+	// create the idle admin thread
+	std::thread ifa_thread(&LaptopFactory::IdleAdminThread,
+			&factory, engineer_cnt, metadata);
+	thread_vector.push_back(std::move(ifa_thread));
 
 	if (!socket.Init(port)) {
 		std::cout << "Socket initialization failed" << std::endl;

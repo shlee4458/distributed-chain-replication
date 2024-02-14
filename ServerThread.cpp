@@ -4,6 +4,10 @@
 
 #include "ServerThread.h"
 #include "ServerStub.h"
+#include "Messages.h"
+
+#define PFA_IDENTIFIER 1
+#define CUSTOMER_IDENTIFIER 2
 
 LaptopInfo LaptopFactory::
 GetLaptopInfo(CustomerRequest request, int engineer_id) {
@@ -23,8 +27,8 @@ CreateLaptop(CustomerRequest request, int engineer_id) {
 	std::promise<LaptopInfo> prom;
 	std::future<LaptopInfo> fut = prom.get_future();
 
-	std::unique_ptr<AdminRequest> req = 
-		std::unique_ptr<AdminRequest>(new AdminRequest);
+	std::unique_ptr<PrimaryAdminRequest> req = 
+		std::unique_ptr<PrimaryAdminRequest>(new PrimaryAdminRequest);
 	req->laptop = laptop;
 	req->prom = std::move(prom);
 
@@ -38,7 +42,7 @@ CreateLaptop(CustomerRequest request, int engineer_id) {
 }
 
 void LaptopFactory::
-UpdateRecord(int customer_id, int order_num) {
+PrimaryUpdateRecord(int customer_id, int order_num) {
 	// create an instance of the MapOp
 	MapOp op;
 	op.opcode = 1;
@@ -89,14 +93,14 @@ ReadRecord(int customer_id) {
 void LaptopFactory::
 EngineerThread(std::unique_ptr<ServerSocket> socket, 
 				int id, 
-				std::shared_ptr<std::map<int, int>> record,
-				std::shared_ptr<std::vector<MapOp>> smr,
+				std::shared_ptr<std::map<int, int>> customer_record,
+				std::shared_ptr<std::vector<MapOp>> smr_log,
 				std::shared_ptr<ServerMetadata> metadata) {
 
 	// set the private variable
 	this->metadata = metadata;
-	customer_record = record;
-	smr_log = smr;
+	this->customer_record = customer_record;
+	this->smr_log = smr_log;
 
 	int engineer_id = id;
 	int request_type, customer_id, order_num;
@@ -105,10 +109,26 @@ EngineerThread(std::unique_ptr<ServerSocket> socket,
 	CustomerRequest request;
 	std::unique_ptr<CustomerRecord> entry;
 	LaptopInfo laptop;
+	int sender;
 
 	stub.Init(std::move(socket), metadata);
 
 	while (true) {
+
+		// identify if it is PFA or Client
+		sender = stub.IdentifySender();
+
+		// if the sender is 1: handle pfa messages
+		if (sender == PFA_IDENTIFIER) {
+
+		} else if (sender == CUSTOMER_IDENTIFIER) {
+
+		} else {
+			std::cout << "Identifier Error!" << std::endl;
+		}
+
+
+		// if the sender is 2: handle customer request 
 		request = stub.ReceiveRequest();
 		if (!request.IsValid()) {
 			break;	
@@ -126,7 +146,7 @@ EngineerThread(std::unique_ptr<ServerSocket> socket,
 				laptop = CreateLaptop(request, engineer_id);
 				stub.ShipLaptop(laptop);
 				break;
-			case 2: // IFA logic (engineer thread)
+			case 2: // Read directly
 			// read the record, and send the record
 				laptop = GetLaptopInfo(request, engineer_id);
 				customer_id = laptop.GetCustomerId();
@@ -140,13 +160,13 @@ EngineerThread(std::unique_ptr<ServerSocket> socket,
 				stub.ShipLaptop(laptop);
 				break;
 			default:
-				std::cout << "Undefined laptop type: "
+				std::cout << "Undefined Request: "
 					<< request_type << std::endl;
 		}
 	}
 }
 
-void LaptopFactory::AdminThread(int id) {
+void LaptopFactory::PrimaryAdminThread(int id) {
 	std::unique_lock<std::mutex> ul(erq_lock, std::defer_lock);
 	int customer_id, order_num;
 	while (true) {
@@ -172,15 +192,25 @@ void LaptopFactory::AdminThread(int id) {
 		// update the record and set the adminid
 		req->laptop.SetAdminId(id);
 		req->prom.set_value(req->laptop);
-		UpdateRecord(customer_id, order_num); 
+		PrimaryUpdateRecord(customer_id, order_num); 
+	}
+}
+
+void LaptopFactory::IdleAdminThread(int id) {
+	while (true) {
+
+		// receive the replication message from the primary
+
+		// unmarshal the message
+
+		// update the customer record and 
 	}
 }
 
 
 
 
-
-// void LaptopFactory::AdminThread(int id) {
+// void LaptopFactory::PrimaryAdminThread(int id) {
 // 	std::unique_lock<std::mutex> ul(erq_lock, std::defer_lock);
 // 	while (true) {
 // 		ul.lock();

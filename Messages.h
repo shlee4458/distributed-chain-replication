@@ -87,4 +87,19 @@ private:
 	int last_order;
 };
 
+class Identifier {
+public:
+	Identifier();
+	int Size();
+
+	int GetIdentifier();
+	void SetIdentifier(int identifier);
+
+	void Marshal(char *buffer);
+	void Unmarshal(char *buffer);
+
+private:
+	int identifier;
+};
+
 #endif // #ifndef __MESSAGES_H__
