@@ -3,8 +3,6 @@
 #include <map>
 
 #include "ServerThread.h"
-#include "ServerStub.h"
-#include "Messages.h"
 
 #define PFA_IDENTIFIER 1
 #define CUSTOMER_IDENTIFIER 2
@@ -59,7 +57,7 @@ PrimaryMaintainLog(int customer_id, int order_num) {
 		int prev_last_idx = metadata->GetLastIndex();
 		int prev_commited_idx = metadata->GetCommittedIndex();
 
-		if (prev_last_idx != prev_commited_idx) {
+		if (prev_last_idx != prev_commited_idx) { // it was idle before
 			// execute the log a the prev_last_idx before appending to the log
 			metadata->ExecuteLog(prev_last_idx);
 		}
@@ -71,10 +69,14 @@ PrimaryMaintainLog(int customer_id, int order_num) {
 		request.Marshal(buffer);
 		size = request.Size();
 
-		if (!stub.SendReplicationRequest(buffer, size)) {
-			// TODO: error handling - have not received from one of the message from the backup
-
+		if (!stub.SendIdentifier()) {
+			// TODO: error handling - idle server failure
 		}
+
+		if (!stub.SendReplicationRequest(buffer, size)) {
+			// TODO: error handling - idle server failure
+		}
+
 		// execute log at the last index, and update the committed_index
 		metadata->ExecuteLog(metadata->GetLastIndex());
 	}
@@ -83,7 +85,6 @@ PrimaryMaintainLog(int customer_id, int order_num) {
 
 void LaptopFactory::
 IdleMaintainLog(int customer_id, int order_num, int req_last, int req_committed) {
-	int size;
 	MapOp op;
 	op.opcode = 1;
 	op.arg1 = customer_id;
@@ -120,8 +121,6 @@ ReadRecord(int customer_id) {
 void LaptopFactory::
 EngineerThread(std::unique_ptr<ServerSocket> socket, 
 				int engieer_id, 
-				std::shared_ptr<std::map<int, int>> customer_record,
-				std::shared_ptr<std::vector<MapOp>> smr_log,
 				std::shared_ptr<ServerMetadata> metadata) {
 	
 	// set the private variable
@@ -176,7 +175,6 @@ void LaptopFactory::CustomerHandler(int engineer_id) {
 	CustomerRequest request;
 	LaptopInfo laptop;
 	int request_type, customer_id, order_num;
-	int factory_id, primary_id;
 
 	request = stub.ReceiveRequest();
 	if (!request.IsValid()) {
@@ -203,7 +201,7 @@ void LaptopFactory::CustomerHandler(int engineer_id) {
 			entry->SetRecord(customer_id, order_num);
 
 			stub.ReturnRecord(std::move(entry));
-			stub.ShipLaptop(laptop);
+			// stub.ShipLaptop(laptop);
 			break;
 		default:
 			std::cout << "Undefined Request: "

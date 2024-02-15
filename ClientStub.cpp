@@ -22,12 +22,16 @@ LaptopInfo ClientStub::Order(CustomerRequest request) {
 }
 
 CustomerRecord ClientStub::ReadRecord(CustomerRequest request) {
-	LaptopInfo info;
+	// LaptopInfo info;
+	// char info_buffer[32];
+	// int info_size;
+	
 	CustomerRecord record;
-	char record_buffer[32], info_buffer[32];
-	int record_size, info_size;
+	char record_buffer[32];
+	int record_size;
 	request.Marshal(record_buffer);
 	record_size = request.Size();
+
 	if (socket.Send(record_buffer, record_size, 0)) {
 
 		// recv the record
@@ -36,18 +40,17 @@ CustomerRecord ClientStub::ReadRecord(CustomerRequest request) {
 			record.Unmarshal(record_buffer);
 		}
 
-		// recv the info
-		info_size = info.Size();
-		if (socket.Recv(info_buffer, info_size, 0)) {
-			info.Unmarshal(info_buffer);
-		}
+		// // recv the info
+		// info_size = info.Size();
+		// if (socket.Recv(info_buffer, info_size, 0)) {
+		// 	info.Unmarshal(info_buffer);
+		// }
 	}
 	return record;
 }
 
 int ClientStub::SendIdentifier(Identifier identifier) {
 	char buffer[4];
-	int size;
 	identifier.Marshal(buffer);
 	return socket.Send(buffer, identifier.Size(), 0);
 }

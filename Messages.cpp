@@ -3,7 +3,6 @@
 #include <arpa/inet.h>
 
 #include "Messages.h"
-#include "ServerMetadata.h"
 
 /**
  * Customer Request

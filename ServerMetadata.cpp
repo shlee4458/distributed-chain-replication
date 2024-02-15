@@ -1,12 +1,7 @@
-#include <memory>
-#include <string.h>
-#include <arpa/inet.h>
-#include <iostream>
-
 #include "ServerMetadata.h"
-#include "ClientSocket.h"
-#include "ServerThread.h"
-#include "Messages.h"
+
+#include <string.h>
+#include <iostream>
 
 ServerMetadata::ServerMetadata() 
 : last_index(-1), committed_idx(-1), primary_id(-1), factory_id(), neighbors() { }
@@ -27,7 +22,7 @@ int ServerMetadata::GetLastIndex() {
     return last_index;
 }
 
-std::vector<std::unique_ptr<ServerNode>> ServerMetadata::GetNeighbors() {
+std::vector<std::shared_ptr<ServerNode>> ServerMetadata::GetNeighbors() {
     return neighbors;
 }
 
@@ -74,19 +69,21 @@ bool ServerMetadata::IsPrimary() {
     return primary_id == factory_id;
 }
 
-void ServerMetadata::AddNeighbors(std::unique_ptr<ServerNode> node) {
+void ServerMetadata::AddNeighbors(std::shared_ptr<ServerNode> node) {
     neighbors.push_back(std::move(node));
 }
 
-void ServerMetadata::ConnectWithNeighbors(std::vector<std::unique_ptr<ClientSocket>> primary_sockets) {
+void ServerMetadata::InitNeighbors(std::vector<std::shared_ptr<ClientSocket>> primary_sockets) {
     // update the vector with ServerNode information
 	std::string ip;
+    // std::shared_ptr<ClientSocket> socket;
 	int port;
 	for (const auto& node : GetNeighbors()) {
 		port = node->port;
 		ip = node->ip;
-		auto socket = std::unique_ptr<ClientSocket>();
-		socket->Init(ip, port);
-		primary_sockets.push_back(std::move(socket));
+		std::shared_ptr<ClientSocket> socket = std::make_shared<ClientSocket>();
+		if (socket->Init(ip, port)) { // if connection is successful
+            primary_sockets.push_back(std::move(socket));
+        }
 	}
 }

@@ -12,6 +12,7 @@
 #include "Messages.h"
 #include "ServerStub.h"
 #include "ServerSocket.h"
+#include "ServerMetadata.h"
 
 struct PrimaryAdminRequest {
 	LaptopInfo laptop;
@@ -21,12 +22,6 @@ struct PrimaryAdminRequest {
 struct IdleAdminRequest {
 	ReplicationRequest repl_request;
 	std::promise<bool> repl_prom;
-};
-
-struct MapOp {
-	int opcode; // operation code : 1 - update value
-	int arg1; // customer_id to apply the operation
-	int arg2; // parameter for the operation
 };
 
 class LaptopFactory {
@@ -59,8 +54,6 @@ private:
 public:
 	void EngineerThread(std::unique_ptr<ServerSocket> socket, 
 						int engieer_id, 
-						std::shared_ptr<std::map<int, int>> record,
-						std::shared_ptr<std::vector<MapOp>> smr,
 						std::shared_ptr<ServerMetadata> metadata);
 	void PrimaryAdminThread(int id);
 	void IdleAdminThread(int id);

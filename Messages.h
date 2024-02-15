@@ -3,6 +3,8 @@
 
 #include <string>
 
+#include "ServerMetadata.h"
+
 class CustomerRequest {
 private:
 	int customer_id;
@@ -89,7 +91,7 @@ private:
 
 class Identifier {
 public:
-	Identifier();
+	Identifier() { };
 	int Size();
 
 	int GetIdentifier();
@@ -104,7 +106,7 @@ private:
 
 class ReplicationRequest {
 public:
-	ReplicationRequest();
+	ReplicationRequest() { };
 	ReplicationRequest(std::shared_ptr<ServerMetadata> metadata, MapOp op);
 	int Size();
 
