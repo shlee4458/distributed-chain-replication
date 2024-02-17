@@ -14,7 +14,9 @@ private:
 	
 public:
 	ServerStub();
+
 	void Init(std::unique_ptr<ServerSocket> socket);
+
 	CustomerRequest ReceiveRequest();
 	int ShipLaptop(LaptopInfo info);
 	int ReturnRecord(std::shared_ptr<CustomerRecord> record);

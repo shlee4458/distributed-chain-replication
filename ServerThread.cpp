@@ -71,10 +71,14 @@ PrimaryMaintainLog(int customer_id, int order_num, int stub_idx) {
 		request.Marshal(buffer);
 		size = request.Size();
 
-		if (!stubs[stub_idx].SendReplicationRequest(buffer, size, metadata->GetPrimarySockets())) {
-			// TODO: error handling - idle server failure
-		}
+		{
+			std::unique_lock<std::mutex> sl(stub_lock);
+			if (!stubs[stub_idx].SendReplicationRequest(buffer, size, metadata->GetPrimarySockets())) {
+				// TODO: error handling - idle server failure
+			}
 
+		}
+		
 		std::cout << request << std::endl;
 
 		// execute log at the last index, and update the committed_index
@@ -122,13 +126,16 @@ EngineerThread(std::unique_ptr<ServerSocket> socket,
 				int engieer_id, 
 				std::shared_ptr<ServerMetadata> metadata) {
 	
-	// set the private variable
+	// synchronize stub creation
+	int stub_idx;
 	this->metadata = metadata;
-	
-	ServerStub stub;
-	stub.Init(std::move(socket));
-	stubs.push_back(std::move(stub));
-	int stub_idx = stubs.size() - 1;
+	{
+		std::unique_lock<std::mutex> sl(stub_lock);
+		ServerStub stub;
+		stub.Init(std::move(socket));
+		stubs.push_back(std::move(stub));
+		stub_idx = stubs.size() - 1;
+	}
 
 	// if the current was primary, close the socket from primary to idle
 	if (!metadata->IsPrimary()) {
