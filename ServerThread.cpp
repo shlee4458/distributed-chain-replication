@@ -46,6 +46,8 @@ void LaptopFactory::
 PrimaryMaintainLog(int customer_id, int order_num, int stub_idx) {
 
 	int size;
+	int neighbor_size;
+	int response_received;
 	MapOp op;
 	op.opcode = 1;
 	op.arg1 = customer_id;
@@ -58,11 +60,12 @@ PrimaryMaintainLog(int customer_id, int order_num, int stub_idx) {
 		int prev_last_idx = metadata->GetLastIndex();
 		int prev_commited_idx = metadata->GetCommittedIndex();
 
-		if (prev_last_idx != prev_commited_idx) { // it was idle before
-			// execute the log a the prev_last_idx before appending to the log
+		// if it was previously an idle server, execute the last log
+		if (prev_last_idx != prev_commited_idx) {
 			metadata->ExecuteLog(prev_last_idx);
 			std::cout << "Executed Log" << std::endl;
 		}
+
 		metadata->AppendLog(op);
 
 		// marshal the metadata(factoryid, committed_idx, last_idx, MapOp)
@@ -73,16 +76,19 @@ PrimaryMaintainLog(int customer_id, int order_num, int stub_idx) {
 
 		{
 			std::unique_lock<std::mutex> sl(stub_lock);
-			if (!stubs[stub_idx].SendReplicationRequest(buffer, size, metadata->GetPrimarySockets())) {
-				// TODO: error handling - idle server failure
+			neighbor_size = metadata->GetNeighborSize();
+			response_received = stubs[stub_idx].SendReplicationRequest(buffer, size, metadata->GetPrimarySockets());
+			if (response_received != neighbor_size) {
+				std::cout << "Some neighbor has not updated the log, so I am not executing the log!" << std::endl;
+				return;
 			}
-
 		}
 		
 		std::cout << request << std::endl;
 
 		// execute log at the last index, and update the committed_index
 		metadata->ExecuteLog(metadata->GetLastIndex());
+		std::cout << "This was executed" << std::endl;
 	}
 	return;
 }
@@ -104,6 +110,7 @@ IdleMaintainLog(int customer_id, int order_num, int req_last, int req_committed,
 		if (req_committed >= 0 && !was_primary) { // need at least 1 MapOp to be present
 			metadata->ExecuteLog(req_committed);
 		}
+
 	}
 }
 
@@ -159,7 +166,7 @@ EngineerThread(std::unique_ptr<ServerSocket> socket,
 				return;
 				break;
 			default:
-				return; // gracefully terminate the engineer thread if the socket is closed by the client
+				return;
 				break;
 		}
 	}
@@ -172,7 +179,10 @@ bool LaptopFactory::PfaHandler(int stub_idx) {
 	while (true) {
 		request = stubs[stub_idx].ReceiveReplication();
 		
-		if (!request.IsValid()) { // switched to primary, terminate
+		// Primary Failure: set the primary_id to -1
+		if (!request.IsValid()) {
+			metadata->SetPrimaryId(-1);
+			std::cout << "Primary Server went down, gracefully exiting" << std::endl;
 			return 0;
 		}
 
@@ -210,14 +220,11 @@ void LaptopFactory::CustomerHandler(int engineer_id, int stub_idx) {
 		request_type = request.GetRequestType();
 		switch (request_type) {
 			case UPDATE_REQUEST: // Update logic: PFA only
-				{
-					std::unique_lock<std::mutex> ml(meta_lock);	
-					if (!metadata->IsPrimary()) { // Idle -> Primary
-						metadata->InitNeighbors();
-						metadata->SetPrimaryId(metadata->GetFactoryId()); // set itself as the primary
-						std::cout << "I wasn't primary! Priamry Id updated!!" << std::endl;	
-						stubs[stub_idx].SendIdentifier(metadata->GetPrimarySockets()); // send one time identifier
-					}
+				if (!metadata->IsPrimary()) { // Idle -> Primary
+					metadata->InitNeighbors();
+					metadata->SetPrimaryId(metadata->GetFactoryId()); // set itself as the primary
+					std::cout << "I wasn't primary! Priamry Id updated!!" << std::endl;	
+					stubs[stub_idx].SendIdentifier(metadata->GetPrimarySockets()); // send one time identifier
 				}
 				laptop = CreateLaptop(request, engineer_id, stub_idx);
 				stubs[stub_idx].ShipLaptop(laptop);
@@ -310,6 +317,10 @@ void LaptopFactory::IdleAdminThread(int id) {
 			std::cout << "I have set the primary id to: " << primary_id << std::endl;
 		}
 		IdleMaintainLog(customer_id, order_num, last_idx, committed_idx, was_primary);
+
+		// send to the primary that the log update is complete
+		stubs[stub_idx].RespondToPrimary();
+		std::cout << "I have responded to the primary!" << std::endl;
 		request->repl_prom.set_value(true);
 	}
 }

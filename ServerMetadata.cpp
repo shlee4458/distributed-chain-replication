@@ -15,10 +15,12 @@ int ServerMetadata::GetFactoryId() {
 }
 
 int ServerMetadata::GetCommittedIndex() {
+    std::unique_lock<std::mutex> ml(meta_lock);
     return committed_idx;
 }
 
 int ServerMetadata::GetLastIndex() {
+    std::unique_lock<std::mutex> ml(meta_lock);
     return last_index;
 }
 
@@ -27,24 +29,34 @@ std::vector<std::shared_ptr<ServerNode>> ServerMetadata::GetNeighbors() {
 }
 
 void ServerMetadata::SetPrimaryId(int id) {
+    std::unique_lock<std::mutex> ml(meta_lock);
 	primary_id = id;
+    return;
 }
 
 void ServerMetadata::SetFactoryId(int id) {
+    std::unique_lock<std::mutex> ml(meta_lock);
     factory_id = id;
+    return;
 }
 
 void ServerMetadata::UpdateLastIndex(int idx) {
+    std::unique_lock<std::mutex> ml(meta_lock);
     last_index = idx;
+    return;
 }
 
 void ServerMetadata::UpdateCommitedIndex(int idx) {
+    std::unique_lock<std::mutex> ml(meta_lock);
     committed_idx = idx;
+    return;
 }
 
 void ServerMetadata::AppendLog(MapOp op) {
+    std::unique_lock<std::mutex> ml(meta_lock);
     smr_log.push_back(op);
     last_index++;
+    return;
 }
 
 MapOp ServerMetadata::GetOp(int idx) {
@@ -52,15 +64,18 @@ MapOp ServerMetadata::GetOp(int idx) {
 }
 
 void ServerMetadata::ExecuteLog(int idx) {
+    std::unique_lock<std::mutex> ml(meta_lock);
     MapOp op = GetOp(idx);
     UpdateRecord(op.arg1, op.arg2);
     committed_idx++;
+    return;
 }
 
 void ServerMetadata::UpdateRecord(int customer_id, int order_num) {
     customer_record[customer_id] = order_num;
     std::cout << "Record Updated for client: " << customer_id 
               << " Order Num: " << order_num << std::endl;
+    return;
 }
 
 bool ServerMetadata::WasBackup() {
@@ -72,6 +87,7 @@ bool ServerMetadata::IsPrimary() {
 }
 
 int ServerMetadata::GetValue(int customer_id) {
+    std::unique_lock<std::mutex> ml(meta_lock);
     auto it = customer_record.find(customer_id);
     if (it != customer_record.end()) { // found the key, return the value
         return customer_record[customer_id];
@@ -79,6 +95,10 @@ int ServerMetadata::GetValue(int customer_id) {
         std::cout << "Key not found!" << std::endl;
         return -1; 
     }
+}
+
+int ServerMetadata::GetNeighborSize() {
+    return GetPrimarySockets().size();
 }
 
 void ServerMetadata::AddNeighbors(std::shared_ptr<ServerNode> node) {
