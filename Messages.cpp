@@ -217,6 +217,9 @@ void CustomerRecord::Print() {
  * Identifier 
 */
 
+Identifier::Identifier()
+: identifier(-1) {	}
+
 void Identifier::SetIdentifier(int identifier) {
 	this->identifier = identifier;
 }
@@ -243,6 +246,8 @@ void Identifier::Unmarshal(char *buffer) {
 /**
  * Replication Message
 */
+ReplicationRequest::ReplicationRequest()
+:last_idx(-1), committed_idx(-1), primary_id(-1) { }
 
 ReplicationRequest::ReplicationRequest(std::shared_ptr<ServerMetadata> metadata, MapOp op) {
     this->last_idx = metadata->GetLastIndex();
@@ -272,6 +277,10 @@ int ReplicationRequest::GetArg1() {
 }
 int ReplicationRequest::GetArg2() {
 	return op.arg2;
+}
+
+bool ReplicationRequest::IsValid() {
+	return last_idx != -1;
 }
 
 void ReplicationRequest::Marshal(char *buffer) {
@@ -323,4 +332,15 @@ void ReplicationRequest::Unmarshal(char *buffer) {
     op.opcode = ntohl(net_opcode);
     op.arg1 = ntohl(net_arg1);
     op.arg2 = ntohl(net_arg2);
+}
+
+std::ostream& operator<<(std::ostream& os, const ReplicationRequest& req) {
+    os << "**** This is ths replication request ****\n"
+	   << "last_idx: " << req.last_idx << ", "
+       << "committed_idx: " << req.committed_idx << ", "
+       << "primary_id: " << req.primary_id << ", "
+       << "op code: " << req.op.opcode << ", "
+	   << "op arg1: " << req.op.arg1 << ", "
+	   << "op arg2: " << req.op.arg2 << ", " << std::endl;
+    return os;
 }

@@ -19,7 +19,7 @@ GetLaptopInfo(CustomerRequest request, int engineer_id) {
 }
 
 LaptopInfo LaptopFactory::
-CreateLaptop(CustomerRequest request, int engineer_id) {
+CreateLaptop(CustomerRequest request, int engineer_id, int stub_idx) {
 	LaptopInfo laptop;
 	laptop.CopyRequest(request);
 	laptop.SetEngineerId(engineer_id);
@@ -27,10 +27,11 @@ CreateLaptop(CustomerRequest request, int engineer_id) {
 	std::promise<LaptopInfo> prom;
 	std::future<LaptopInfo> fut = prom.get_future();
 
-	std::unique_ptr<PrimaryAdminRequest> req = 
-		std::unique_ptr<PrimaryAdminRequest>(new PrimaryAdminRequest);
+	std::shared_ptr<PrimaryAdminRequest> req = 
+		std::shared_ptr<PrimaryAdminRequest>(new PrimaryAdminRequest);
 	req->laptop = laptop;
 	req->prom = std::move(prom);
+	req->stub_idx = stub_idx;
 
 	erq_lock.lock();
 	erq.push(std::move(req));
@@ -42,7 +43,7 @@ CreateLaptop(CustomerRequest request, int engineer_id) {
 }
 
 void LaptopFactory::
-PrimaryMaintainLog(int customer_id, int order_num) {
+PrimaryMaintainLog(int customer_id, int order_num, int stub_idx) {
 
 	int size;
 	MapOp op;
@@ -60,6 +61,7 @@ PrimaryMaintainLog(int customer_id, int order_num) {
 		if (prev_last_idx != prev_commited_idx) { // it was idle before
 			// execute the log a the prev_last_idx before appending to the log
 			metadata->ExecuteLog(prev_last_idx);
+			std::cout << "Executed Log" << std::endl;
 		}
 		metadata->AppendLog(op);
 
@@ -69,13 +71,11 @@ PrimaryMaintainLog(int customer_id, int order_num) {
 		request.Marshal(buffer);
 		size = request.Size();
 
-		if (!stub.SendIdentifier()) {
+		if (!stubs[stub_idx].SendReplicationRequest(buffer, size, metadata->GetPrimarySockets())) {
 			// TODO: error handling - idle server failure
 		}
 
-		if (!stub.SendReplicationRequest(buffer, size)) {
-			// TODO: error handling - idle server failure
-		}
+		std::cout << request << std::endl;
 
 		// execute log at the last index, and update the committed_index
 		metadata->ExecuteLog(metadata->GetLastIndex());
@@ -84,7 +84,7 @@ PrimaryMaintainLog(int customer_id, int order_num) {
 }
 
 void LaptopFactory::
-IdleMaintainLog(int customer_id, int order_num, int req_last, int req_committed) {
+IdleMaintainLog(int customer_id, int order_num, int req_last, int req_committed, bool was_primary) {
 	MapOp op;
 	op.opcode = 1;
 	op.arg1 = customer_id;
@@ -92,11 +92,14 @@ IdleMaintainLog(int customer_id, int order_num, int req_last, int req_committed)
 	{
 		std::unique_lock<std::mutex> ul(log_lock);
 
-		// append the new log and update the last_index :: TODO: ASK#####################################
+		// append the new log and update the last_index
 		metadata->AppendLog(op);
 
-		// execute the log at the req.committed index 
-		metadata->ExecuteLog(req_committed);
+		// execute the log at the req.committed index
+		// it is not the case that the server was primary
+		if (req_committed >= 0 && !was_primary) { // need at least 1 MapOp to be present
+			metadata->ExecuteLog(req_committed);
+		}
 	}
 }
 
@@ -127,91 +130,118 @@ EngineerThread(std::unique_ptr<ServerSocket> socket,
 	this->metadata = metadata;
 	this->customer_record = customer_record;
 	this->smr_log = smr_log;
-
+	
+	ServerStub stub;
 	stub.Init(std::move(socket));
+	stubs.push_back(std::move(stub));
+	int stub_idx = stubs.size() - 1;
 
-	int sender;
+	// if the current was primary, close the socket from primary to idle
+	if (!metadata->IsPrimary()) {
+		metadata->GetNeighbors().clear();
+	}
+
+	int sender = stubs[stub_idx].IdentifySender(); // identify sender; PrimaryServer or Customer
 	while (true) {
-		sender = stub.IdentifySender(); // identify sender; PrimaryServer or Customer
+		// sender = stub.IdentifySender(); // identify sender; PrimaryServer or Customer
 		switch (sender) {
 			case PFA_IDENTIFIER:
-				PfaHandler();
+				std::cout << "I have received a message from the Primary server!" << std::endl;
+				PfaHandler(stub_idx);
+				std::cout << "CONNECTION WITH THE SERVER HAS BEEN TERMINATED" << std::endl;
+				return;
 				break;
 			case CUSTOMER_IDENTIFIER:
-				CustomerHandler(engieer_id);
+				std::cout << "I have received a message from a customer!" << std::endl;
+				CustomerHandler(engieer_id, stub_idx);
+				std::cout << "CONNECTION WITH THE CLIENT HAS BEEN TERMINATED" << std::endl;
+				return;
 				break;
 			default:
-				std::cout << "Identifier Error!" << std::endl;
+				return; // gracefully terminate the engineer thread if the socket is closed by the client
 				break;
 		}
 	}
 }
 
-bool LaptopFactory::PfaHandler() {
+bool LaptopFactory::PfaHandler(int stub_idx) {
 
 	ReplicationRequest request;
-	bool success;
-	request = stub.ReceiveReplication();
+	// bool success;
+	while (true) {
+		request = stubs[stub_idx].ReceiveReplication();
+		
+		if (!request.IsValid()) { // switched to primary, terminate
+			return 0;
+		}
 
-	std::promise<bool> prom;
-	std::future<bool> fut = prom.get_future();
+		std::promise<bool> prom;
+		std::future<bool> fut = prom.get_future();
 
-	std::unique_ptr<IdleAdminRequest> idle_req = 
-		std::unique_ptr<IdleAdminRequest>(new IdleAdminRequest);
-	idle_req->repl_request = request;
-	idle_req->repl_prom = std::move(prom);
+		std::shared_ptr<IdleAdminRequest> idle_req = 
+			std::shared_ptr<IdleAdminRequest>(new IdleAdminRequest);
+		idle_req->repl_request = request;
+		idle_req->repl_prom = std::move(prom);
+		idle_req->stub_idx = stub_idx;
 
-	rep_lock.lock();
-	req.push(std::move(idle_req));
-	rep_cv.notify_one();
-	rep_lock.unlock();
+		rep_lock.lock();
+		req.push(std::move(idle_req));
+		rep_cv.notify_one();
+		rep_lock.unlock();
 
-	success = fut.get();
-	return success;
+		// success = fut.get();
+		// return success;
+	}
 }
 
-void LaptopFactory::CustomerHandler(int engineer_id) {
-	std::unique_ptr<CustomerRecord> entry;
+void LaptopFactory::CustomerHandler(int engineer_id, int stub_idx) {
+	std::shared_ptr<CustomerRecord> entry;
 	CustomerRequest request;
 	LaptopInfo laptop;
 	int request_type, customer_id, order_num;
 
-	request = stub.ReceiveRequest();
-	if (!request.IsValid()) {
-		return;
-	}
-	request_type = request.GetRequestType();
-	switch (request_type) {
-		case UPDATE_REQUEST: // Update logic: PFA only
-			if (!metadata->IsPrimary()) {
-				stub.ConnectWithBackups(metadata);
-			}
+	while (true) {
+		
+		request = stubs[stub_idx].ReceiveRequest();
+		if (!request.IsValid()) {
+			return;
+		}
+		request_type = request.GetRequestType();
+		switch (request_type) {
+			case UPDATE_REQUEST: // Update logic: PFA only
+				if (!metadata->IsPrimary()) { // Idle -> Primary
+					metadata->InitNeighbors(); 
+					metadata->SetPrimaryId(metadata->GetFactoryId()); // set itself as the primary
+					stubs[stub_idx].SendIdentifier(metadata->GetPrimarySockets()); // send one time identifier
+					std::cout << "I wasn't primary! Priamry Id updated!!" << std::endl;
+				}
 
-			laptop = CreateLaptop(request, engineer_id);
-			stub.ShipLaptop(laptop);
-			break;
-		case READ_REQUEST: // Read logic: both PFA, IFA
-			// read the record, and send the record
-			laptop = GetLaptopInfo(request, engineer_id);
-			customer_id = laptop.GetCustomerId();
-			order_num = ReadRecord(customer_id);
+				laptop = CreateLaptop(request, engineer_id, stub_idx);
+				stubs[stub_idx].ShipLaptop(laptop);
+				break;
+			case READ_REQUEST: // Read logic: both PFA, IFA
+				// read the record, and send the record
+				laptop = GetLaptopInfo(request, engineer_id);
+				customer_id = laptop.GetCustomerId();
+				order_num = ReadRecord(customer_id);
 
-			// get the record to return to the client
-			entry = std::unique_ptr<CustomerRecord>(new CustomerRecord());
-			entry->SetRecord(customer_id, order_num);
+				// get the record to return to the client
+				entry = std::shared_ptr<CustomerRecord>(new CustomerRecord());
+				entry->SetRecord(customer_id, order_num);
 
-			stub.ReturnRecord(std::move(entry));
-			// stub.ShipLaptop(laptop);
-			break;
-		default:
-			std::cout << "Undefined Request: "
-				<< request_type << std::endl;
+				stubs[stub_idx].ReturnRecord(std::move(entry));
+				// stub.ShipLaptop(laptop);
+				break;
+			default:
+				std::cout << "Undefined Request: "
+					<< request_type << std::endl;
+		}
 	}
 }
 
 void LaptopFactory::PrimaryAdminThread(int id) {
 	std::unique_lock<std::mutex> ul(erq_lock, std::defer_lock);
-	int customer_id, order_num;
+	int customer_id, order_num, stub_idx;
 	while (true) {
 		ul.lock();
 
@@ -226,11 +256,12 @@ void LaptopFactory::PrimaryAdminThread(int id) {
 		// get the customer_id and order_num from the request
 		customer_id = req->laptop.GetCustomerId();
 		order_num = req->laptop.GetOrderNumber();
-
+		stub_idx = req->stub_idx;
+		
 		// update the record and set the adminid
 		req->laptop.SetAdminId(id);
 		req->prom.set_value(req->laptop);
-		PrimaryMaintainLog(customer_id, order_num); 
+		PrimaryMaintainLog(customer_id, order_num, stub_idx); 
 	}
 }
 
@@ -238,7 +269,7 @@ void LaptopFactory::IdleAdminThread(int id) {
 
 	std::unique_lock<std::mutex> rl(rep_lock, std::defer_lock);
 	int last_idx, committed_idx, primary_id;
-	int customer_id, order_num;
+	int customer_id, order_num, stub_idx;
 
 	while (true) {
 		rl.lock();
@@ -246,6 +277,7 @@ void LaptopFactory::IdleAdminThread(int id) {
 		if (req.empty()) {
 			rep_cv.wait(rl, [this]{ return !req.empty(); });
 		}
+		std::cout << "Successfully received the replication request" << std::endl;
 
 		auto request = std::move(req.front());
 		req.pop();
@@ -257,10 +289,22 @@ void LaptopFactory::IdleAdminThread(int id) {
 		primary_id = request->repl_request.GetPrimaryId();
 		customer_id = request->repl_request.GetArg1();
 		order_num = request->repl_request.GetArg2();
+		stub_idx = request->stub_idx;
+		std::cout << "last_idx: " << last_idx << std::endl;
+		std::cout << "committed_idx: " << committed_idx << std::endl;
+		std::cout << "primary_id: " << primary_id << std::endl;
+		std::cout << "customer_id: " << customer_id << std::endl;
+		std::cout << "order_num: " << order_num << std::endl;
+
+		// check if the current server was the primary
+		bool was_primary = (metadata->GetFactoryId() == metadata->GetPrimaryId());
 
 		// update the metadata; commited index, last index
-		metadata->SetPrimaryId(primary_id);
-		IdleMaintainLog(customer_id, order_num, last_idx, committed_idx);
+		if (was_primary) {
+			metadata->SetPrimaryId(primary_id);
+			std::cout << "I have set the primary id to: " << primary_id << std::endl;
+		}
+		IdleMaintainLog(customer_id, order_num, last_idx, committed_idx, was_primary);
 		request->repl_prom.set_value(true);
 	}
 }

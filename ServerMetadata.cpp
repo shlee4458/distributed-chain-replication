@@ -4,7 +4,7 @@
 #include <iostream>
 
 ServerMetadata::ServerMetadata() 
-: last_index(-1), committed_idx(-1), primary_id(-1), factory_id(), neighbors() { }
+: last_index(-1), committed_idx(-1), primary_id(-1), factory_id(-1), neighbors() { }
 
 int ServerMetadata::GetPrimaryId() {
     return primary_id;
@@ -59,6 +59,8 @@ void ServerMetadata::ExecuteLog(int idx) {
 
 void ServerMetadata::UpdateRecord(int customer_id, int order_num) {
     customer_record[customer_id] = order_num;
+    std::cout << "Record Updated for client: " << customer_id 
+              << " Order Num: " << order_num << std::endl;
 }
 
 bool ServerMetadata::WasBackup() {
@@ -73,7 +75,11 @@ void ServerMetadata::AddNeighbors(std::shared_ptr<ServerNode> node) {
     neighbors.push_back(std::move(node));
 }
 
-void ServerMetadata::InitNeighbors(std::vector<std::shared_ptr<ClientSocket>> primary_sockets) {
+void ServerMetadata::InitNeighbors() {
+
+    // empty the primary sockets; primary -> idle -> primary
+    primary_sockets.clear();
+
     // update the vector with ServerNode information
 	std::string ip;
     // std::shared_ptr<ClientSocket> socket;
@@ -86,4 +92,8 @@ void ServerMetadata::InitNeighbors(std::vector<std::shared_ptr<ClientSocket>> pr
             primary_sockets.push_back(std::move(socket));
         }
 	}
+}
+
+std::vector<std::shared_ptr<ClientSocket>> ServerMetadata::GetPrimarySockets() {
+    return primary_sockets;
 }

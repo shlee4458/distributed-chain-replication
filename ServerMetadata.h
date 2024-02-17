@@ -26,7 +26,9 @@ private:
     int committed_idx;
     int primary_id;
     int factory_id;
+    bool is_primary = false;
     std::vector<std::shared_ptr<ServerNode>> neighbors;
+    std::vector<std::shared_ptr<ClientSocket>> primary_sockets; // socket to the backup nodes as a primary
     std::map<int, int> customer_record;
     std::vector<MapOp> smr_log;
 
@@ -38,13 +40,14 @@ public:
     int GetLastIndex();
     int GetCommittedIndex();
     std::vector<std::shared_ptr<ServerNode>> GetNeighbors();
+    std::vector<std::shared_ptr<ClientSocket>> GetPrimarySockets();
+    MapOp GetOp(int idx);
 
     void SetFactoryId(int id);
     void SetPrimaryId(int id);
     void UpdateLastIndex(int idx);
     void UpdateCommitedIndex(int idx);
     void AppendLog(MapOp op);
-    MapOp GetOp(int idx);
     void UpdateRecord(int customer_id, int order_num);
     void ExecuteLog(int idx);
 
@@ -52,7 +55,7 @@ public:
     bool IsPrimary();
 
     void AddNeighbors(std::shared_ptr<ServerNode> node);
-    void InitNeighbors(std::vector<std::shared_ptr<ClientSocket>> primary_sockets);
+    void InitNeighbors();
 };
 
 #endif

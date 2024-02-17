@@ -17,18 +17,19 @@
 struct PrimaryAdminRequest {
 	LaptopInfo laptop;
 	std::promise<LaptopInfo> prom;
+	int stub_idx;
 };
 
 struct IdleAdminRequest {
 	ReplicationRequest repl_request;
 	std::promise<bool> repl_prom;
+	int stub_idx;
 };
 
 class LaptopFactory {
 private:
-	ServerStub stub;
-	std::queue<std::unique_ptr<PrimaryAdminRequest>> erq;
-	std::queue<std::unique_ptr<IdleAdminRequest>> req;
+	std::queue<std::shared_ptr<PrimaryAdminRequest>> erq;
+	std::queue<std::shared_ptr<IdleAdminRequest>> req;
 
 	std::mutex erq_lock;
 	std::mutex log_lock;
@@ -36,18 +37,21 @@ private:
 
 	std::condition_variable erq_cv;
 	std::condition_variable rep_cv;
+
 	std::shared_ptr<std::map<int, int>> customer_record;
 	std::shared_ptr<std::vector<MapOp>> smr_log;
 	std::shared_ptr<ServerMetadata> metadata;
 
+	std::vector<ServerStub> stubs;
+
 	LaptopInfo GetLaptopInfo(CustomerRequest order, int engineer_id);
-	LaptopInfo CreateLaptop(CustomerRequest order, int engineer_id);
-	bool PfaHandler();
-	void CustomerHandler(int engineer_id);
+	LaptopInfo CreateLaptop(CustomerRequest order, int engineer_id, int stub_idx);
+	bool PfaHandler(int stub_idx);
+	void CustomerHandler(int engineer_id, int stub_idx);
 
 	int ReadRecord(int customer_id);
-	void PrimaryMaintainLog(int customer_id, int order_num);
-	void IdleMaintainLog(int customer_id, int order_num, int req_last, int req_committed);
+	void PrimaryMaintainLog(int customer_id, int order_num, int stub_idx);
+	void IdleMaintainLog(int customer_id, int order_num, int req_last, int req_committed, bool was_primary);
 
 	void ExecuteLog(int idx);
 

@@ -91,7 +91,7 @@ private:
 
 class Identifier {
 public:
-	Identifier() { };
+	Identifier();
 	int Size();
 
 	int GetIdentifier();
@@ -106,7 +106,7 @@ private:
 
 class ReplicationRequest {
 public:
-	ReplicationRequest() { };
+	ReplicationRequest();
 	ReplicationRequest(std::shared_ptr<ServerMetadata> metadata, MapOp op);
 	int Size();
 
@@ -116,9 +116,12 @@ public:
 	int GetOpCode();
 	int GetArg1();
 	int GetArg2();
+	bool IsValid();
 
 	void Marshal(char *buffer);
 	void Unmarshal(char *buffer);
+
+	friend std::ostream& operator<<(std::ostream& os, const ReplicationRequest& req);
 private:
     int last_idx;
     int committed_idx;

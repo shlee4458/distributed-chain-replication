@@ -1,10 +1,33 @@
 ./server [ port #] [ unique ID ] [# peers ] ( repeat [ ID ] [ IP ] [ port #])
 ./server 12345 0 2 1 22.22.22.22 12345 2 33.33.33.33 12345
 
+
+
 ./client 123.456.789.123 12345 1 128 3
 ./client ip 12345 1 128 3
-
 
 # CLA before change
 ./server 12345 1
 ./client 127.0.0.1 12345 55 128 1
+
+
+ssh qsaasp@login.khoury.northeastern.edu
+pw: long one
+
+
+ssh qsaasp@linux-071.khoury.northeastern.edu  10.200.125.71
+ssh qsaasp@linux-072.khoury.northeastern.edu  10.200.125.72
+ssh qsaasp@linux-073.khoury.northeastern.edu  10.200.125.73
+
+./server 12345 0 1 1 10.200.125.72 12345
+./server 12345 1 1 0 10.200.125.71 12345
+
+./client 10.200.125.71 12345 1 3 1
+
+
+./server 12345 0 1 1 10.200.125.72 12345
+./client 127.0.0.1 12345 1 5 1
+
+
+
+scp -r ./hw1 qsaasp@login.khoury.northeastern.edu:

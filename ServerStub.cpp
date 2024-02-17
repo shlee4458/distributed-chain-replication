@@ -1,5 +1,7 @@
 #include "ServerStub.h"
 
+#include <iostream>
+
 #define PFA_IDENTIFIER 1
 
 ServerStub::ServerStub() {}
@@ -23,19 +25,13 @@ int ServerStub::ShipLaptop(LaptopInfo info) {
 	return socket->Send(buffer, info.Size(), 0);
 }
 
-int ServerStub::ReturnRecord(std::unique_ptr<CustomerRecord> record) {
+int ServerStub::ReturnRecord(std::shared_ptr<CustomerRecord> record) {
 	char buffer[32];
 	record->Marshal(buffer);
 	return socket->Send(buffer, record->Size(), 0);
 }
 
-// establish connection with the backup servers
-	// open connection with all the neighboring servers as the client
-void ServerStub::ConnectWithBackups(std::shared_ptr<ServerMetadata> metadata) {
-	metadata->InitNeighbors(primary_sockets);
-}
-
-int ServerStub::SendReplicationRequest(char* buffer, int size) {
+int ServerStub::SendReplicationRequest(char* buffer, int size, std::vector<std::shared_ptr<ClientSocket>> primary_sockets) {
 
 	// iterate over all the neighbor nodes, and send the replication request
 	for (auto const& socket : primary_sockets) {
@@ -46,18 +42,23 @@ int ServerStub::SendReplicationRequest(char* buffer, int size) {
 	return 1; // upon successfully receiving all the messages, return 1
 }
 
-int ServerStub::SendIdentifier() {
+int ServerStub::SendIdentifier(std::vector<std::shared_ptr<ClientSocket>> primary_sockets) {
+
+	if (primary_sockets.empty()) { // if no neighbors are present, do not send
+		return 1;
+	}
 
 	// send identifier to the idle server
 	char identifier_buffer[4];
 	int identifier_size;
-	std::unique_ptr<Identifier> identifier;
+	auto identifier = std::shared_ptr<Identifier>(new Identifier());
 	identifier->SetIdentifier(PFA_IDENTIFIER);
 	identifier->Marshal(identifier_buffer); // store the identifier value in the buffer
 	identifier_size = identifier->Size();
 
 	for (auto const& socket : primary_sockets) {
-		if (socket->Send(identifier_buffer, identifier_size)) {
+		std::cout << "There is a peer" << std::endl;
+		if (!socket->Send(identifier_buffer, identifier_size)) {
 			return 0; // failed to send an identifier to an idle server
 		}
 	}
@@ -67,7 +68,7 @@ int ServerStub::SendIdentifier() {
 int ServerStub::IdentifySender() {
 	// return 1 if it is pfa, 2 if it is customer
 	char buffer[4];
-	std::unique_ptr<Identifier> identifier;
+	auto identifier = std::shared_ptr<Identifier>(new Identifier());
 	if (socket->Recv(buffer, sizeof(int), 0)) {
 		identifier->Unmarshal(buffer);
 		return identifier->GetIdentifier();
@@ -80,6 +81,7 @@ ReplicationRequest ServerStub::ReceiveReplication() {
 	ReplicationRequest request;
 	int size = request.Size();
 	if (socket->Recv(buffer, size, 0)) {
+		std::cout << "Replication Received!!!!" << std::endl;
 		request.Unmarshal(buffer);
 	}
 	return request;

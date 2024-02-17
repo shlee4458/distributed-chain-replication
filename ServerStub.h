@@ -11,19 +11,19 @@
 class ServerStub {
 private:
 	std::unique_ptr<ServerSocket> socket;
-	std::vector<std::shared_ptr<ClientSocket>> primary_sockets; // socket to the backup nodes as a primary
+	
 public:
 	ServerStub();
 	void Init(std::unique_ptr<ServerSocket> socket);
 	CustomerRequest ReceiveRequest();
 	int ShipLaptop(LaptopInfo info);
-	int ReturnRecord(std::unique_ptr<CustomerRecord> record);
+	int ReturnRecord(std::shared_ptr<CustomerRecord> record);
 	void ConnectWithBackups(std::shared_ptr<ServerMetadata> metadata);
-	int SendReplicationRequest(char* buffer, int size);
+	int SendReplicationRequest(char* buffer, int size, std::vector<std::shared_ptr<ClientSocket>> primary_sockets);
 
 	ReplicationRequest ReceiveReplication();
 	int IdentifySender();
-	int SendIdentifier();
+	int SendIdentifier(std::vector<std::shared_ptr<ClientSocket>> primary_sockets);
 };
 
 #endif // end of #ifndef __SERVER_STUB_H__

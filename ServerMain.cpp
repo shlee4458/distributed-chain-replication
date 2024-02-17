@@ -15,8 +15,6 @@ int main(int argc, char *argv[]) {
 
 	ServerSocket socket;
 	LaptopFactory factory;
-	// ServerNode node;
-	std::shared_ptr<ServerMetadata> metadata;
 	std::unique_ptr<ServerSocket> new_socket;
 	std::vector<std::thread> thread_vector;
 
@@ -29,15 +27,18 @@ int main(int argc, char *argv[]) {
 	port = atoi(argv[1]);
 	unique_id = atoi(argv[2]);
 	num_peers = atoi(argv[3]);
+	std::cout << "num_peers: " << num_peers << std::endl;
 
 	// update the server metadata
+	auto metadata = std::make_shared<ServerMetadata>();
 	metadata->SetFactoryId(unique_id);
-	for (int i = 4; i < num_peers; i += 3) {
+	for (int i = 4, j = 0; j < num_peers; i += 3, j++) {
 		// create a node and add the node as the neighbor of the current server
-		std::unique_ptr<ServerNode> node = std::unique_ptr<ServerNode>();
+		std::shared_ptr<ServerNode> node = std::shared_ptr<ServerNode>(new ServerNode());
 		node->id = atoi(argv[i]);
 		node->ip = argv[i + 1];
 		node->port = atoi(argv[i + 2]);
+		std::cout << "Created peer node: " << j + 1 << std::endl;
 
 		metadata->AddNeighbors(std::move(node));
 	}
@@ -46,7 +47,6 @@ int main(int argc, char *argv[]) {
 	std::thread pfa_thread(&LaptopFactory::PrimaryAdminThread, 
 			&factory, engineer_cnt++);
 	thread_vector.push_back(std::move(pfa_thread));
-
 	// create the idle admin thread
 	std::thread ifa_thread(&LaptopFactory::IdleAdminThread,
 			&factory, engineer_cnt++);
@@ -58,8 +58,10 @@ int main(int argc, char *argv[]) {
 	}
 
 	while ((new_socket = socket.Accept())) {
+		std::cout << "I have received the connection request from the primary" << std::endl;
 		std::thread engineer_thread(&LaptopFactory::EngineerThread, &factory, 
 				std::move(new_socket), engineer_cnt++, metadata);
+			// engineer_thread.detach();
 		thread_vector.push_back(std::move(engineer_thread));
 	}
 	return 0;

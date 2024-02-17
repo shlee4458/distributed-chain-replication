@@ -24,12 +24,16 @@ ThreadBody(std::string ip, int port, int customer_id, int num_requests, int requ
 		std::cout << "Thread " << customer_id << " failed to connect" << std::endl;
 		return;
 	}
+
+	// send the one-time identifier first
+	identifier.SetIdentifier(CLIENT_IDENTIFIER);
+	if (stub.SendIdentifier(identifier)) {
+		std::cout << "Successfully sent identifier" << std::endl;
+	} else {
+		std::cout << "identifier not sent" << std::endl;
+	}
+
 	for (int i = 0; i < num_requests; i++) {
-
-		// send the identifier first
-		identifier.SetIdentifier(CLIENT_IDENTIFIER);
-		stub.SendIdentifier(identifier);
-
 		timer.Start();
 		// based on the request_type, call different RPC
 		switch (request_type) {
