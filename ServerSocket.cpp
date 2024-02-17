@@ -43,7 +43,7 @@ bool ServerSocket::Init(int port) {
 	return true;
 }
 
-std::unique_ptr<ServerSocket> ServerSocket::Accept() {
+std::shared_ptr<ServerSocket> ServerSocket::Accept() {
 	int accepted_fd;
 	struct sockaddr_in addr;
 	unsigned int addr_size = sizeof(addr);
@@ -53,5 +53,5 @@ std::unique_ptr<ServerSocket> ServerSocket::Accept() {
 		return nullptr;
 	}
 
-	return std::unique_ptr<ServerSocket>(new ServerSocket(accepted_fd, IsNagleOn()));
+	return std::shared_ptr<ServerSocket>(new ServerSocket(accepted_fd, IsNagleOn()));
 }

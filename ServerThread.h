@@ -17,13 +17,13 @@
 struct PrimaryAdminRequest {
 	LaptopInfo laptop;
 	std::promise<LaptopInfo> prom;
-	int stub_idx;
+	std::shared_ptr<ServerStub> stub;
 };
 
 struct IdleAdminRequest {
 	ReplicationRequest repl_request;
 	// std::promise<bool> repl_prom;
-	int stub_idx;
+	std::shared_ptr<ServerStub> stub;
 };
 
 class LaptopFactory {
@@ -40,21 +40,21 @@ private:
 
 	std::shared_ptr<ServerMetadata> metadata;
 
-	std::vector<ServerStub> stubs;
+	std::vector<std::shared_ptr<ServerStub>> stubs;
 
 	LaptopInfo GetLaptopInfo(CustomerRequest order, int engineer_id);
-	LaptopInfo CreateLaptop(CustomerRequest order, int engineer_id, int stub_idx);
-	bool PfaHandler(int stub_idx);
-	void CustomerHandler(int engineer_id, int stub_idx);
+	LaptopInfo CreateLaptop(CustomerRequest order, int engineer_id, std::shared_ptr<ServerStub> stub);
+	bool PfaHandler(std::shared_ptr<ServerStub> stub);
+	void CustomerHandler(int engineer_id, std::shared_ptr<ServerStub> stub);
 
 	int ReadRecord(int customer_id);
-	void PrimaryMaintainLog(int customer_id, int order_num, int stub_idx);
+	void PrimaryMaintainLog(int customer_id, int order_num, std::shared_ptr<ServerStub> stub);
 	void IdleMaintainLog(int customer_id, int order_num, int req_last, int req_committed, bool was_primary);
 
 	void ExecuteLog(int idx);
 
 public:
-	void EngineerThread(std::unique_ptr<ServerSocket> socket, 
+	void EngineerThread(std::shared_ptr<ServerSocket> socket, 
 						int engieer_id, 
 						std::shared_ptr<ServerMetadata> metadata);
 	void PrimaryAdminThread(int id);

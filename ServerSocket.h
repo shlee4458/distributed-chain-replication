@@ -13,7 +13,7 @@ public:
 	ServerSocket(int fd, bool nagle_on = NAGLE_ON);
 
 	bool Init(int port);
-	std::unique_ptr<ServerSocket> Accept();
+	std::shared_ptr<ServerSocket> Accept();
 };
 
 

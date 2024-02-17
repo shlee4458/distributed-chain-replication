@@ -15,7 +15,7 @@ int main(int argc, char *argv[]) {
 
 	ServerSocket socket;
 	LaptopFactory factory;
-	std::unique_ptr<ServerSocket> new_socket;
+	std::shared_ptr<ServerSocket> new_socket;
 	std::vector<std::thread> thread_vector;
 
 	if (argc < 4 || (argc - 4) % 3 != 0) {

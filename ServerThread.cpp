@@ -19,7 +19,7 @@ GetLaptopInfo(CustomerRequest request, int engineer_id) {
 }
 
 LaptopInfo LaptopFactory::
-CreateLaptop(CustomerRequest request, int engineer_id, int stub_idx) {
+CreateLaptop(CustomerRequest request, int engineer_id, std::shared_ptr<ServerStub> stub) {
 	LaptopInfo laptop;
 	laptop.CopyRequest(request);
 	laptop.SetEngineerId(engineer_id);
@@ -31,7 +31,7 @@ CreateLaptop(CustomerRequest request, int engineer_id, int stub_idx) {
 		std::shared_ptr<PrimaryAdminRequest>(new PrimaryAdminRequest);
 	req->laptop = laptop;
 	req->prom = std::move(prom);
-	req->stub_idx = stub_idx;
+	req->stub = stub;
 
 	erq_lock.lock();
 	erq.push(std::move(req));
@@ -46,33 +46,34 @@ CreateLaptop(CustomerRequest request, int engineer_id, int stub_idx) {
  * Entrance to the engineer thread.
 */
 void LaptopFactory::
-EngineerThread(std::unique_ptr<ServerSocket> socket, 
+EngineerThread(std::shared_ptr<ServerSocket> socket, 
 				int engieer_id, 
 				std::shared_ptr<ServerMetadata> metadata) {
 	
 	// synchronize stub creation
-	int stub_idx, sender;
+	int sender;
 	this->metadata = metadata;
+	auto stub = std::make_shared<ServerStub>();
+	stub->Init(std::move(socket));
+	sender = stub->IdentifySender();
+
 	{
 		std::unique_lock<std::mutex> sl(stub_lock);
-		ServerStub stub;
-		stub.Init(std::move(socket));
-		stubs.push_back(std::move(stub));
-		stub_idx = stubs.size() - 1;
-		sender = stubs[stub_idx].IdentifySender();
+		stubs.push_back(stub);
+
 	}
 	
 	while (true) {
 		switch (sender) {
 			case PFA_IDENTIFIER:
 				std::cout << "I have received a message from the Primary server!" << std::endl;
-				PfaHandler(stub_idx);
+				PfaHandler(stub);
 				std::cout << "CONNECTION WITH THE SERVER HAS BEEN TERMINATED" << std::endl;
 				return;
 				break;
 			case CUSTOMER_IDENTIFIER:
 				std::cout << "I have received a message from a customer!" << std::endl;
-				CustomerHandler(engieer_id, stub_idx);
+				CustomerHandler(engieer_id, stub);
 				std::cout << "CONNECTION WITH THE CLIENT HAS BEEN TERMINATED" << std::endl;
 				return;
 				break;
@@ -83,11 +84,11 @@ EngineerThread(std::unique_ptr<ServerSocket> socket,
 	}
 }
 
-bool LaptopFactory::PfaHandler(int stub_idx) {
+bool LaptopFactory::PfaHandler(std::shared_ptr<ServerStub> stub) {
 
 	ReplicationRequest request;
 	while (true) {
-		request = stubs[stub_idx].ReceiveReplication();
+		request = stub->ReceiveReplication();
 		
 		// Primary Failure: set the primary_id to -1
 		if (!request.IsValid()) {
@@ -101,7 +102,7 @@ bool LaptopFactory::PfaHandler(int stub_idx) {
 
 
 		idle_req->repl_request = request;
-		idle_req->stub_idx = stub_idx;
+		idle_req->stub = stub;
 		// std::promise<bool> prom;
 		// std::future<bool> fut = prom.get_future();
 		// idle_req->repl_prom = std::move(prom);
@@ -113,7 +114,7 @@ bool LaptopFactory::PfaHandler(int stub_idx) {
 	}
 }
 
-void LaptopFactory::CustomerHandler(int engineer_id, int stub_idx) {
+void LaptopFactory::CustomerHandler(int engineer_id, std::shared_ptr<ServerStub> stub) {
 	std::shared_ptr<CustomerRecord> entry;
 	CustomerRequest request;
 	LaptopInfo laptop;
@@ -121,7 +122,7 @@ void LaptopFactory::CustomerHandler(int engineer_id, int stub_idx) {
 
 	while (true) {
 		
-		request = stubs[stub_idx].ReceiveRequest();
+		request = stub->ReceiveRequest();
 		if (!request.IsValid()) {
 			return;
 		}
@@ -132,10 +133,10 @@ void LaptopFactory::CustomerHandler(int engineer_id, int stub_idx) {
 					metadata->InitNeighbors();
 					metadata->SetPrimaryId(metadata->GetFactoryId()); // set itself as the primary
 					std::cout << "I wasn't primary! Priamry Id updated!!" << std::endl;
-					stubs[stub_idx].SendIdentifier(metadata->GetPrimarySockets()); // send one time identifier
+					stub->SendIdentifier(metadata->GetPrimarySockets()); // send one time identifier
 				}
-				laptop = CreateLaptop(request, engineer_id, stub_idx);
-				stubs[stub_idx].ShipLaptop(laptop);
+				laptop = CreateLaptop(request, engineer_id, stub);
+				stub->ShipLaptop(laptop);
 				break;
 			case READ_REQUEST: // Read logic: both PFA, IFA
 				// read the record, and send the record
@@ -149,7 +150,7 @@ void LaptopFactory::CustomerHandler(int engineer_id, int stub_idx) {
 				entry->SetRecord(customer_id, order_num);
 				entry->Print();
 
-				stubs[stub_idx].ReturnRecord(std::move(entry));
+				stub->ReturnRecord(std::move(entry));
 				break;
 			default:
 				std::cout << "Undefined Request: "
@@ -166,7 +167,9 @@ ReadRecord(int customer_id) {
 
 void LaptopFactory::PrimaryAdminThread(int id) {
 	std::unique_lock<std::mutex> ul(erq_lock, std::defer_lock);
+	std::shared_ptr<ServerStub> stub;
 	int customer_id, order_num, stub_idx;
+
 	while (true) {
 		ul.lock();
 
@@ -181,18 +184,20 @@ void LaptopFactory::PrimaryAdminThread(int id) {
 		// get the customer_id and order_num from the request
 		customer_id = req->laptop.GetCustomerId();
 		order_num = req->laptop.GetOrderNumber();
-		stub_idx = req->stub_idx;
+		stub = req->stub;
 		
 		// update the record and set the adminid
 		req->laptop.SetAdminId(id);
 		req->prom.set_value(req->laptop);
-		PrimaryMaintainLog(customer_id, order_num, stub_idx); 
+		PrimaryMaintainLog(customer_id, order_num, stub); 
 	}
 }
 
 void LaptopFactory::IdleAdminThread(int id) {
 
 	std::unique_lock<std::mutex> rl(rep_lock, std::defer_lock);
+	std::shared_ptr<ServerStub> stub;
+
 	int last_idx, committed_idx, primary_id;
 	int customer_id, order_num, stub_idx;
 
@@ -214,7 +219,7 @@ void LaptopFactory::IdleAdminThread(int id) {
 		primary_id = request->repl_request.GetPrimaryId();
 		customer_id = request->repl_request.GetArg1();
 		order_num = request->repl_request.GetArg2();
-		stub_idx = request->stub_idx;
+		stub = request->stub;
 		std::cout << "last_idx: " << last_idx << std::endl;
 		std::cout << "committed_idx: " << committed_idx << std::endl;
 		std::cout << "primary_id: " << primary_id << std::endl;
@@ -232,14 +237,14 @@ void LaptopFactory::IdleAdminThread(int id) {
 		IdleMaintainLog(customer_id, order_num, last_idx, committed_idx, was_primary);
 
 		// send to the primary that the log update is complete
-		stubs[stub_idx].RespondToPrimary();
+		stub->RespondToPrimary();
 		std::cout << "I have responded to the primary!" << std::endl;
 		// request->repl_prom.set_value(true);
 	}
 }
 
 void LaptopFactory::
-PrimaryMaintainLog(int customer_id, int order_num, int stub_idx) {
+PrimaryMaintainLog(int customer_id, int order_num, std::shared_ptr<ServerStub> stub) {
 
 	int size, neighbor_size, response_received;
 	MapOp op;
@@ -267,7 +272,7 @@ PrimaryMaintainLog(int customer_id, int order_num, int stub_idx) {
 	{
 		std::unique_lock<std::mutex> sl(stub_lock);
 		neighbor_size = metadata->GetNeighborSize();
-		response_received = stubs[stub_idx].SendReplicationRequest(buffer, size, metadata->GetPrimarySockets());
+		response_received = stub->SendReplicationRequest(buffer, size, metadata->GetPrimarySockets());
 		if (response_received != neighbor_size) {
 			std::cout << "Some neighbor has not updated the log, so I am not executing the log!" << std::endl;
 			return;

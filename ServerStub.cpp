@@ -6,7 +6,7 @@
 
 ServerStub::ServerStub() {}
 
-void ServerStub::Init(std::unique_ptr<ServerSocket> socket) {
+void ServerStub::Init(std::shared_ptr<ServerSocket> socket) {
 	this->socket = std::move(socket);
 }
 
@@ -57,7 +57,7 @@ int ServerStub::SendReplicationRequest(char* buffer, int size, std::vector<std::
 	return total_response;
 }
 
-int ServerStub::SendIdentifier(std::vector<std::shared_ptr<ClientSocket>> primary_sockets) {
+int ServerStub::SendIdentifier(std::vector<std::shared_ptr<ClientSocket>> primary_sockets) const {
 
 	if (primary_sockets.empty()) { // if no neighbors are present, do not send
 		return 1;
@@ -80,7 +80,7 @@ int ServerStub::SendIdentifier(std::vector<std::shared_ptr<ClientSocket>> primar
 	return 1;
 }
 
-int ServerStub::IdentifySender() {
+int ServerStub::IdentifySender() const {
 	// return 1 if it is pfa, 2 if it is customer
 	char buffer[4];
 	auto identifier = std::shared_ptr<Identifier>(new Identifier());
@@ -91,7 +91,7 @@ int ServerStub::IdentifySender() {
 	return 0; // identification failed
 }
 
-ReplicationRequest ServerStub::ReceiveReplication() {
+ReplicationRequest ServerStub::ReceiveReplication() const {
 	char buffer[32];
 	ReplicationRequest request;
 	
@@ -104,7 +104,7 @@ ReplicationRequest ServerStub::ReceiveReplication() {
 }
 
 
-int ServerStub::RespondToPrimary() {
+int ServerStub::RespondToPrimary() const {
 	char buffer[4];
 	Identifier identifier;
 	int size = identifier.Size();

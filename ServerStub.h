@@ -10,12 +10,12 @@
 
 class ServerStub {
 private:
-	std::unique_ptr<ServerSocket> socket;
+	std::shared_ptr<ServerSocket> socket;
 	
 public:
 	ServerStub();
 
-	void Init(std::unique_ptr<ServerSocket> socket);
+	void Init(std::shared_ptr<ServerSocket> socket);
 
 	CustomerRequest ReceiveRequest();
 	int ShipLaptop(LaptopInfo info);
@@ -23,10 +23,10 @@ public:
 	void ConnectWithBackups(std::shared_ptr<ServerMetadata> metadata);
 	int SendReplicationRequest(char* buffer, int size, std::vector<std::shared_ptr<ClientSocket>> primary_sockets);
 
-	ReplicationRequest ReceiveReplication();
-	int IdentifySender();
-	int SendIdentifier(std::vector<std::shared_ptr<ClientSocket>> primary_sockets);
-	int RespondToPrimary();
+	ReplicationRequest ReceiveReplication() const;
+	int IdentifySender() const;
+	int SendIdentifier(std::vector<std::shared_ptr<ClientSocket>> primary_sockets) const;
+	int RespondToPrimary() const;
 };
 
 #endif // end of #ifndef __SERVER_STUB_H__
