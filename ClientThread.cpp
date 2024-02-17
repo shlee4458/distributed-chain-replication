@@ -61,7 +61,7 @@ ThreadBody(std::string ip, int port, int customer_id, int num_requests, int requ
 
 				// Backup server failure; exit gracefully
 				if (record.GetCustomerId() == RECORD_DEFAULT) {
-					std::cout << "Backup server went down, graceuflly exiting" << std::endl;
+					std::cout << "Server went down, graceuflly exiting" << std::endl;
 					return;
 				}
 

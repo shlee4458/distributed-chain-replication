@@ -22,7 +22,7 @@ struct PrimaryAdminRequest {
 
 struct IdleAdminRequest {
 	ReplicationRequest repl_request;
-	std::promise<bool> repl_prom;
+	// std::promise<bool> repl_prom;
 	int stub_idx;
 };
 
@@ -32,7 +32,6 @@ private:
 	std::queue<std::shared_ptr<IdleAdminRequest>> req;
 
 	std::mutex erq_lock;
-	std::mutex log_lock;
 	std::mutex rep_lock;
 	std::mutex stub_lock;
 

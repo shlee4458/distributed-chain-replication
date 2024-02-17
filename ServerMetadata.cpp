@@ -110,9 +110,7 @@ void ServerMetadata::InitNeighbors() {
     // empty the primary sockets; primary -> idle -> primary
     primary_sockets.clear();
 
-    // update the vector with ServerNode information
 	std::string ip;
-    // std::shared_ptr<ClientSocket> socket;
 	int port;
 	for (const auto& node : GetNeighbors()) {
 		port = node->port;
