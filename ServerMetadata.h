@@ -50,6 +50,7 @@ public:
     void AppendLog(MapOp op);
     void UpdateRecord(int customer_id, int order_num);
     void ExecuteLog(int idx);
+    int GetValue(int customer_id);
 
     bool WasBackup();
     bool IsPrimary();

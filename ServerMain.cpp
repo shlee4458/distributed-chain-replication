@@ -47,6 +47,7 @@ int main(int argc, char *argv[]) {
 	std::thread pfa_thread(&LaptopFactory::PrimaryAdminThread, 
 			&factory, engineer_cnt++);
 	thread_vector.push_back(std::move(pfa_thread));
+	
 	// create the idle admin thread
 	std::thread ifa_thread(&LaptopFactory::IdleAdminThread,
 			&factory, engineer_cnt++);

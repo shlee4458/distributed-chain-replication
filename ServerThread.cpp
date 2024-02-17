@@ -109,12 +109,8 @@ ReadRecord(int customer_id) {
 	// obtain a lock, and return value if the key exists, otherwise return -1
 	{
 		std::unique_lock<std::mutex> ul(log_lock);
-		auto it = customer_record->find(customer_id);
-		if (it != customer_record->end()) { // found the key, return the value
-			return (*customer_record)[customer_id];
-		} else { // key not found, return -1
-			return -1; 
-		}
+		return metadata->GetValue(customer_id);
+
 	}
 }
 
@@ -128,8 +124,6 @@ EngineerThread(std::unique_ptr<ServerSocket> socket,
 	
 	// set the private variable
 	this->metadata = metadata;
-	this->customer_record = customer_record;
-	this->smr_log = smr_log;
 	
 	ServerStub stub;
 	stub.Init(std::move(socket));
@@ -209,13 +203,15 @@ void LaptopFactory::CustomerHandler(int engineer_id, int stub_idx) {
 		request_type = request.GetRequestType();
 		switch (request_type) {
 			case UPDATE_REQUEST: // Update logic: PFA only
-				if (!metadata->IsPrimary()) { // Idle -> Primary
-					metadata->InitNeighbors(); 
-					metadata->SetPrimaryId(metadata->GetFactoryId()); // set itself as the primary
-					stubs[stub_idx].SendIdentifier(metadata->GetPrimarySockets()); // send one time identifier
-					std::cout << "I wasn't primary! Priamry Id updated!!" << std::endl;
+				{
+					std::unique_lock<std::mutex> ml(meta_lock);	
+					if (!metadata->IsPrimary()) { // Idle -> Primary
+						metadata->InitNeighbors();
+						metadata->SetPrimaryId(metadata->GetFactoryId()); // set itself as the primary
+						std::cout << "I wasn't primary! Priamry Id updated!!" << std::endl;	
+						stubs[stub_idx].SendIdentifier(metadata->GetPrimarySockets()); // send one time identifier
+					}
 				}
-
 				laptop = CreateLaptop(request, engineer_id, stub_idx);
 				stubs[stub_idx].ShipLaptop(laptop);
 				break;
@@ -223,11 +219,13 @@ void LaptopFactory::CustomerHandler(int engineer_id, int stub_idx) {
 				// read the record, and send the record
 				laptop = GetLaptopInfo(request, engineer_id);
 				customer_id = laptop.GetCustomerId();
+				std::cout << "Received a READ REQUEST for: " << customer_id << std::endl;
 				order_num = ReadRecord(customer_id);
 
 				// get the record to return to the client
 				entry = std::shared_ptr<CustomerRecord>(new CustomerRecord());
 				entry->SetRecord(customer_id, order_num);
+				entry->Print();
 
 				stubs[stub_idx].ReturnRecord(std::move(entry));
 				// stub.ShipLaptop(laptop);
@@ -297,7 +295,7 @@ void LaptopFactory::IdleAdminThread(int id) {
 		std::cout << "order_num: " << order_num << std::endl;
 
 		// check if the current server was the primary
-		bool was_primary = (metadata->GetFactoryId() == metadata->GetPrimaryId());
+		bool was_primary = metadata->IsPrimary();
 
 		// update the metadata; commited index, last index
 		if (was_primary) {

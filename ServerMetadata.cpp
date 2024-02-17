@@ -71,6 +71,16 @@ bool ServerMetadata::IsPrimary() {
     return primary_id == factory_id;
 }
 
+int ServerMetadata::GetValue(int customer_id) {
+    auto it = customer_record.find(customer_id);
+    if (it != customer_record.end()) { // found the key, return the value
+        return customer_record[customer_id];
+    } else { // key not found, return -1
+        std::cout << "Key not found!" << std::endl;
+        return -1; 
+    }
+}
+
 void ServerMetadata::AddNeighbors(std::shared_ptr<ServerNode> node) {
     neighbors.push_back(std::move(node));
 }
