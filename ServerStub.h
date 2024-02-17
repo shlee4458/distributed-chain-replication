@@ -26,7 +26,6 @@ public:
 	ReplicationRequest ReceiveReplication();
 	int IdentifySender();
 	int SendIdentifier(std::vector<std::shared_ptr<ClientSocket>> primary_sockets);
-	int RespondToPrimary();
 };
 
 #endif // end of #ifndef __SERVER_STUB_H__

@@ -34,27 +34,12 @@ int ServerStub::ReturnRecord(std::shared_ptr<CustomerRecord> record) {
 int ServerStub::SendReplicationRequest(char* buffer, int size, std::vector<std::shared_ptr<ClientSocket>> primary_sockets) {
 
 	// iterate over all the neighbor nodes, and send the replication request
-	int total_response = 0;
-	char response_buffer[4];
-	Identifier identifier;
-
 	for (auto const& socket : primary_sockets) {
-
-		// if any one of the idle servers failed
-			// consider response was received
-			// continue sending it to the other idle servers
-		if (!socket->Send(buffer, size, 0)) {
-			total_response++;
-			continue;
+		if (!socket->Send(buffer, size, 0)) { // idle server failure
+			return 0;
 		}
-
-		if (socket->Recv(response_buffer, sizeof(identifier), 0)) {
-			identifier.Unmarshal(response_buffer);
-			total_response += identifier.GetIdentifier();
-		}
-
 	}
-	return total_response;
+	return 1; // upon successfully receiving all the messages, return 1
 }
 
 int ServerStub::SendIdentifier(std::vector<std::shared_ptr<ClientSocket>> primary_sockets) {
@@ -94,21 +79,10 @@ int ServerStub::IdentifySender() {
 ReplicationRequest ServerStub::ReceiveReplication() {
 	char buffer[32];
 	ReplicationRequest request;
-	
 	int size = request.Size();
 	if (socket->Recv(buffer, size, 0)) {
 		std::cout << "Replication Received!!!!" << std::endl;
 		request.Unmarshal(buffer);
 	}
 	return request;
-}
-
-
-int ServerStub::RespondToPrimary() {
-	char buffer[4];
-	Identifier identifier;
-	int size = identifier.Size();
-	identifier.SetIdentifier(PFA_IDENTIFIER);
-	identifier.Marshal(buffer);
-	return socket->Send(buffer, size, 0);
 }

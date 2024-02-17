@@ -6,8 +6,6 @@
 #define READ_REQUEST 2
 #define DEBUG 3
 #define CLIENT_IDENTIFIER 2
-#define LAPTOP_DEFAULT -1
-#define RECORD_DEFAULT -2
 
 ClientThreadClass::ClientThreadClass() {}
 
@@ -42,13 +40,6 @@ ThreadBody(std::string ip, int port, int customer_id, int num_requests, int requ
 			case UPDATE_REQUEST:
 				request.SetRequest(customer_id, i, UPDATE_REQUEST);
 				laptop = stub.Order(request);
-
-				// Primary server failure; exit gracefully
-				if (laptop.GetCustomerId() == LAPTOP_DEFAULT) {
-					std::cout << "Primary server went down, graceuflly exiting" << std::endl;
-					return;
-				}
-
 				break;
 			case READ_REQUEST:
 			case DEBUG:
@@ -58,13 +49,6 @@ ThreadBody(std::string ip, int port, int customer_id, int num_requests, int requ
 				if (request_type == DEBUG && record.IsValid()) {
 					record.Print();
 				}
-
-				// Backup server failure; exit gracefully
-				if (record.GetCustomerId() == RECORD_DEFAULT) {
-					std::cout << "Backup server went down, graceuflly exiting" << std::endl;
-					return;
-				}
-
 				break;
 			default:
 				break;

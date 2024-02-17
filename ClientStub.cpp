@@ -39,6 +39,12 @@ CustomerRecord ClientStub::ReadRecord(CustomerRequest request) {
 		if (socket.Recv(record_buffer, record_size, 0)) {
 			record.Unmarshal(record_buffer);
 		}
+
+		// // recv the info
+		// info_size = info.Size();
+		// if (socket.Recv(info_buffer, info_size, 0)) {
+		// 	info.Unmarshal(info_buffer);
+		// }
 	}
 	return record;
 }

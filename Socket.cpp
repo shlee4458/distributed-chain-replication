@@ -60,7 +60,6 @@ int Socket::Recv(char *buffer, int size, int flags) {
 			}
 			*/
 			//perror("ERROR: failed to recv");
-
 			Close();
 			return 0;
 		}
@@ -92,7 +91,6 @@ void Socket::Close() {
 	shutdown(fd_, SHUT_RDWR);
 	close(fd_);
 	//perror("Socket closed");
-	fd_ = -1; // set the fd to -1
 	is_initialized_ = false;
 }
 
