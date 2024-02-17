@@ -168,7 +168,7 @@ void LaptopInfo::Print() {
 */
 
 CustomerRecord::CustomerRecord() {
-	customer_id = -1;
+	customer_id = -2;
 	last_order = -1;
 }
 
@@ -176,6 +176,9 @@ bool CustomerRecord::IsValid() {
 	return last_order != -1;
 }
 
+int CustomerRecord::GetCustomerId() {
+	return customer_id;
+}
 
 void CustomerRecord::SetRecord(int id, int ordnum) {
 	customer_id = id;
@@ -218,7 +221,7 @@ void CustomerRecord::Print() {
 */
 
 Identifier::Identifier()
-: identifier(-1) {	}
+: identifier(0) {	}
 
 void Identifier::SetIdentifier(int identifier) {
 	this->identifier = identifier;

@@ -4,6 +4,7 @@
 #include <vector>
 #include <memory>
 #include <map>
+#include <mutex>
 #include <string.h>
 
 #include "ClientSocket.h"
@@ -31,6 +32,8 @@ private:
     std::vector<std::shared_ptr<ClientSocket>> primary_sockets; // socket to the backup nodes as a primary
     std::map<int, int> customer_record;
     std::vector<MapOp> smr_log;
+    std::mutex meta_lock;
+    std::mutex meta_lock2;
 
 public:
     ServerMetadata();
@@ -39,6 +42,7 @@ public:
     int GetFactoryId();
     int GetLastIndex();
     int GetCommittedIndex();
+    int GetNeighborSize();
     std::vector<std::shared_ptr<ServerNode>> GetNeighbors();
     std::vector<std::shared_ptr<ClientSocket>> GetPrimarySockets();
     MapOp GetOp(int idx);

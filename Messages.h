@@ -43,6 +43,7 @@ private:
 
 public:
 	LaptopInfo();
+	
 	void operator = (const LaptopInfo &info) {
 		customer_id = info.customer_id;
 		order_number = info.order_number;
@@ -76,6 +77,7 @@ public:
 	CustomerRecord();
 	void SetRecord(int id, int ordnum);
 	int Size();
+	int GetCustomerId();
 
 	void Marshal(char *buffer);
 	void Unmarshal(char *buffer);

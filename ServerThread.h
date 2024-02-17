@@ -13,7 +13,6 @@
 #include "ServerStub.h"
 #include "ServerSocket.h"
 #include "ServerMetadata.h"
-#include "ServerThreadSafeVector.h"
 
 struct PrimaryAdminRequest {
 	LaptopInfo laptop;
@@ -35,7 +34,6 @@ private:
 	std::mutex erq_lock;
 	std::mutex log_lock;
 	std::mutex rep_lock;
-	std::mutex meta_lock;
 	std::mutex stub_lock;
 
 	std::condition_variable erq_cv;
@@ -44,7 +42,6 @@ private:
 	std::shared_ptr<ServerMetadata> metadata;
 
 	std::vector<ServerStub> stubs;
-	// ThreadSafeVector<ServerStub> stubs;
 
 	LaptopInfo GetLaptopInfo(CustomerRequest order, int engineer_id);
 	LaptopInfo CreateLaptop(CustomerRequest order, int engineer_id, int stub_idx);
@@ -58,7 +55,7 @@ private:
 	void ExecuteLog(int idx);
 
 public:
-	void EngineerThread(std::shared_ptr<ServerSocket> socket, 
+	void EngineerThread(std::unique_ptr<ServerSocket> socket, 
 						int engieer_id, 
 						std::shared_ptr<ServerMetadata> metadata);
 	void PrimaryAdminThread(int id);
