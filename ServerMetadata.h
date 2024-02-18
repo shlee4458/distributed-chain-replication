@@ -9,6 +9,7 @@
 #include <deque>
 
 #include "ClientSocket.h"
+#include "Messages.h"
 
 struct ServerNode {
     int id;
@@ -24,7 +25,7 @@ struct MapOp {
 
 class ServerMetadata {
 private:
-    int last_index;
+    int last_idx;
     int committed_idx;
     int primary_id;
     int factory_id;
@@ -43,16 +44,17 @@ public:
     int GetLastIndex();
     int GetCommittedIndex();
     int GetNeighborSize();
+    int GetPeerSize();
     std::vector<std::shared_ptr<ServerNode>> GetNeighbors();
     std::deque<std::shared_ptr<ClientSocket>> GetPrimarySockets();
     MapOp GetOp(int idx);
+    ReplicationRequest GetReplicationRequest(MapOp op);
 
     void SetFactoryId(int id);
     void SetPrimaryId(int id);
     void UpdateLastIndex(int idx);
     void UpdateCommitedIndex(int idx);
     void AppendLog(MapOp op);
-    void UpdateRecord(int customer_id, int order_num);
     void ExecuteLog(int idx);
     int GetValue(int customer_id);
 
@@ -61,6 +63,7 @@ public:
 
     void AddNeighbors(std::shared_ptr<ServerNode> node);
     void InitNeighbors();
+    int SendReplicationRequest(MapOp op);
 };
 
 #endif

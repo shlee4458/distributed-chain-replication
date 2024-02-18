@@ -252,15 +252,18 @@ void Identifier::Unmarshal(char *buffer) {
 ReplicationRequest::ReplicationRequest()
 :last_idx(-1), committed_idx(-1), primary_id(-1) { }
 
-ReplicationRequest::ReplicationRequest(std::shared_ptr<ServerMetadata> metadata, MapOp op) {
-    this->last_idx = metadata->GetLastIndex();
-    this->committed_idx = metadata->GetCommittedIndex();
-    this->primary_id = metadata->GetPrimaryId();
-    this->op = op;
+ReplicationRequest::ReplicationRequest(int last_idx, int committed_idx, int primary_id, int op_code, int op_arg1, int op_arg2) {
+    this->last_idx = last_idx;
+    this->committed_idx = committed_idx;
+    this->primary_id = primary_id;
+    this->op_code = op_code;
+	this->op_arg1 = op_arg1;
+	this->op_arg2 = op_arg2;
 }
 
 int ReplicationRequest::Size() {
-	return sizeof(last_idx) + sizeof(committed_idx) + sizeof(primary_id) + sizeof(op);
+	return sizeof(last_idx) + sizeof(committed_idx) + sizeof(primary_id) 
+	+ sizeof(op_code) + sizeof(op_arg1) + sizeof(op_arg2);
 }
 
 int ReplicationRequest::GetLastIdx() {
@@ -273,13 +276,13 @@ int ReplicationRequest::GetPrimaryId() {
 	return primary_id;
 }
 int ReplicationRequest::GetOpCode() {
-	return op.opcode;
+	return op_code;
 }
 int ReplicationRequest::GetArg1() {
-	return op.arg1;
+	return op_arg1;
 }
 int ReplicationRequest::GetArg2() {
-	return op.arg2;
+	return op_arg2;
 }
 
 bool ReplicationRequest::IsValid() {
@@ -290,9 +293,9 @@ void ReplicationRequest::Marshal(char *buffer) {
 	int net_primary_id = htonl(primary_id);
 	int net_last_idx = htonl(last_idx);
     int net_committed_idx = htonl(committed_idx);
-    int net_opcode = htonl(op.opcode);
-    int net_arg1 = htonl(op.arg1);
-    int net_arg2 = htonl(op.arg2);
+    int net_opcode = htonl(op_code);
+    int net_arg1 = htonl(op_arg1);
+    int net_arg2 = htonl(op_arg2);
 
 	int offset = 0;
 	memcpy(buffer + offset, &net_primary_id, sizeof(net_primary_id));
@@ -332,9 +335,9 @@ void ReplicationRequest::Unmarshal(char *buffer) {
 	primary_id = ntohl(net_primary_id);
 	last_idx = ntohl(net_last_idx);
     committed_idx = ntohl(net_committed_idx); 
-    op.opcode = ntohl(net_opcode);
-    op.arg1 = ntohl(net_arg1);
-    op.arg2 = ntohl(net_arg2);
+    op_code = ntohl(net_opcode);
+    op_arg1 = ntohl(net_arg1);
+    op_arg2 = ntohl(net_arg2);
 }
 
 std::ostream& operator<<(std::ostream& os, const ReplicationRequest& req) {
@@ -342,8 +345,8 @@ std::ostream& operator<<(std::ostream& os, const ReplicationRequest& req) {
 	   << "last_idx: " << req.last_idx << ", "
        << "committed_idx: " << req.committed_idx << ", "
        << "primary_id: " << req.primary_id << ", "
-       << "op code: " << req.op.opcode << ", "
-	   << "op arg1: " << req.op.arg1 << ", "
-	   << "op arg2: " << req.op.arg2 << ", " << std::endl;
+       << "op code: " << req.op_code << ", "
+	   << "op arg1: " << req.op_arg1 << ", "
+	   << "op arg2: " << req.op_arg2 << ", " << std::endl;
     return os;
 }

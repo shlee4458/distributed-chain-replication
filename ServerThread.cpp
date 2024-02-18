@@ -114,7 +114,7 @@ bool LaptopFactory::PfaHandler(std::shared_ptr<ServerStub> stub) {
 }
 
 void LaptopFactory::CustomerHandler(int engineer_id, std::shared_ptr<ServerStub> stub) {
-	// std::unique_lock<std::mutex> cl(create_lock, std::defer_lock);
+	std::unique_lock<std::mutex> ml(meta_lock, std::defer_lock);
 	std::shared_ptr<CustomerRecord> entry;
 	CustomerRequest request;
 	LaptopInfo laptop;
@@ -129,12 +129,14 @@ void LaptopFactory::CustomerHandler(int engineer_id, std::shared_ptr<ServerStub>
 		request_type = request.GetRequestType();
 		switch (request_type) {
 			case UPDATE_REQUEST: // Update logic: PFA only
+				ml.lock();
 				if (!metadata->IsPrimary()) { // Idle -> Primary
-					metadata->InitNeighbors();
 					metadata->SetPrimaryId(metadata->GetFactoryId()); // set itself as the primary
+					metadata->InitNeighbors();
 					std::cout << "I wasn't primary! Priamry Id updated!!" << std::endl;
 					stub->SendIdentifier(metadata->GetPrimarySockets()); // send one time identifier
 				}
+				ml.unlock();
 				laptop = CreateLaptop(request, engineer_id, stub);
 				stub->ShipLaptop(laptop);
 				break;
@@ -161,12 +163,13 @@ void LaptopFactory::CustomerHandler(int engineer_id, std::shared_ptr<ServerStub>
 
 int LaptopFactory::
 ReadRecord(int customer_id) {
-	// obtain a lock, and return value if the key exists, otherwise return -1
+	// no synchronization issue; one thread for the client read operation
 	return metadata->GetValue(customer_id);
 }
 
 void LaptopFactory::PrimaryAdminThread(int id) {
-	std::unique_lock<std::mutex> ul(erq_lock, std::defer_lock);
+	std::unique_lock<std::mutex> ul(erq_lock, std::defer_lock), 
+								 ml(meta_lock, std::defer_lock);
 	std::shared_ptr<ServerStub> stub;
 	int customer_id, order_num;
 
@@ -189,13 +192,15 @@ void LaptopFactory::PrimaryAdminThread(int id) {
 		// update the record and set the adminid
 		req->laptop.SetAdminId(id);
 		req->prom.set_value(req->laptop);
+		ml.lock();
 		PrimaryMaintainLog(customer_id, order_num, stub); 
+		ml.unlock();
 	}
 }
 
 void LaptopFactory::IdleAdminThread(int id) {
-
-	std::unique_lock<std::mutex> rl(rep_lock, std::defer_lock);
+	std::unique_lock<std::mutex> rl(rep_lock, std::defer_lock), 
+								 ml(meta_lock, std::defer_lock);
 	std::shared_ptr<ServerStub> stub;
 
 	int last_idx, committed_idx, primary_id;
@@ -220,11 +225,7 @@ void LaptopFactory::IdleAdminThread(int id) {
 		customer_id = request->repl_request.GetArg1();
 		order_num = request->repl_request.GetArg2();
 		stub = request->stub;
-		std::cout << "last_idx: " << last_idx << std::endl;
-		std::cout << "committed_idx: " << committed_idx << std::endl;
-		std::cout << "primary_id: " << primary_id << std::endl;
-		std::cout << "customer_id: " << customer_id << std::endl;
-		std::cout << "order_num: " << order_num << std::endl;
+		std::cout << request << std::endl;
 
 		// check if the current server was the primary
 		bool was_primary = metadata->IsPrimary();
@@ -234,26 +235,27 @@ void LaptopFactory::IdleAdminThread(int id) {
 			metadata->SetPrimaryId(primary_id);
 			std::cout << "I have set the primary id to: " << primary_id << std::endl;
 		}
+		ml.lock();
 		IdleMaintainLog(customer_id, order_num, last_idx, committed_idx, was_primary);
+		ml.unlock();
 
 		// send to the primary that the log update is complete
 		stub->RespondToPrimary();
 		std::cout << "I have responded to the primary!" << std::endl;
-		// request->repl_prom.set_value(true);
 	}
 }
 
 void LaptopFactory::
 PrimaryMaintainLog(int customer_id, int order_num, const std::shared_ptr<ServerStub>& stub) {
+	
+	int response_received, prev_last_idx, prev_commited_idx;
 
-	int size, neighbor_size, response_received;
 	MapOp op;
 	op.opcode = 1;
 	op.arg1 = customer_id;
 	op.arg2 = order_num;
-
-	int prev_last_idx = metadata->GetLastIndex();
-	int prev_commited_idx = metadata->GetCommittedIndex();
+	prev_last_idx = metadata->GetLastIndex();
+	prev_commited_idx = metadata->GetCommittedIndex();
 
 	// if it was previously an idle server, execute the last log
 	if (prev_last_idx != prev_commited_idx) {
@@ -262,21 +264,12 @@ PrimaryMaintainLog(int customer_id, int order_num, const std::shared_ptr<ServerS
 	}
 
 	metadata->AppendLog(op);
+	response_received = metadata->SendReplicationRequest(op);
 
-	// marshal the metadata(factoryid, committed_idx, last_idx, MapOp)
-	char buffer[32];
-	ReplicationRequest request(metadata, op);
-	request.Marshal(buffer);
-	size = request.Size();
-
-	neighbor_size = metadata->GetNeighborSize();
-	response_received = stub->SendReplicationRequest(buffer, size, metadata->GetPrimarySockets());
-	if (response_received != neighbor_size) {
-		std::cout << "Some neighbor has not updated the log, so I am not executing the log!" << std::endl;
-		return;
+	// if the number of response_received does not match the neighbor size
+	if (!response_received) {
+		return; // return without executing the log
 	}
-	
-	std::cout << request << std::endl;
 
 	// execute log at the last index, and update the committed_index
 	metadata->ExecuteLog(metadata->GetLastIndex());

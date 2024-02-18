@@ -1,10 +1,11 @@
 #include "ServerMetadata.h"
+#include "Messages.h"
 
 #include <string.h>
 #include <iostream>
 
 ServerMetadata::ServerMetadata() 
-: last_index(-1), committed_idx(-1), primary_id(-1), factory_id(-1), neighbors() { }
+: last_idx(-1), committed_idx(-1), primary_id(-1), factory_id(-1), neighbors() { }
 
 int ServerMetadata::GetPrimaryId() {
     return primary_id;
@@ -15,13 +16,11 @@ int ServerMetadata::GetFactoryId() {
 }
 
 int ServerMetadata::GetCommittedIndex() {
-    std::unique_lock<std::mutex> ml(meta_lock);
     return committed_idx;
 }
 
 int ServerMetadata::GetLastIndex() {
-    std::unique_lock<std::mutex> ml(meta_lock);
-    return last_index;
+    return last_idx;
 }
 
 std::vector<std::shared_ptr<ServerNode>> ServerMetadata::GetNeighbors() {
@@ -29,33 +28,28 @@ std::vector<std::shared_ptr<ServerNode>> ServerMetadata::GetNeighbors() {
 }
 
 void ServerMetadata::SetPrimaryId(int id) {
-    std::unique_lock<std::mutex> ml(meta_lock);
 	primary_id = id;
     return;
 }
 
 void ServerMetadata::SetFactoryId(int id) {
-    std::unique_lock<std::mutex> ml(meta_lock);
     factory_id = id;
     return;
 }
 
 void ServerMetadata::UpdateLastIndex(int idx) {
-    std::unique_lock<std::mutex> ml(meta_lock);
-    last_index = idx;
+    last_idx = idx;
     return;
 }
 
 void ServerMetadata::UpdateCommitedIndex(int idx) {
-    std::unique_lock<std::mutex> ml(meta_lock);
     committed_idx = idx;
     return;
 }
 
 void ServerMetadata::AppendLog(MapOp op) {
-    std::unique_lock<std::mutex> ml(meta_lock);
     smr_log.push_back(op);
-    last_index++;
+    last_idx++;
     return;
 }
 
@@ -64,17 +58,16 @@ MapOp ServerMetadata::GetOp(int idx) {
 }
 
 void ServerMetadata::ExecuteLog(int idx) {
-    std::unique_lock<std::mutex> ml(meta_lock);
+    int customer_id, order_num;
+    
     MapOp op = GetOp(idx);
-    UpdateRecord(op.arg1, op.arg2);
-    committed_idx++;
-    return;
-}
+    customer_id = op.arg1;
+    order_num = op.arg2;
 
-void ServerMetadata::UpdateRecord(int customer_id, int order_num) {
     customer_record[customer_id] = order_num;
     std::cout << "Record Updated for client: " << customer_id 
               << " Order Num: " << order_num << std::endl;
+    committed_idx++;
     return;
 }
 
@@ -83,7 +76,6 @@ bool ServerMetadata::WasBackup() {
 }
 
 bool ServerMetadata::IsPrimary() {
-    std::unique_lock<std::mutex> ml(meta_lock);
     return primary_id == factory_id;
 }
 
@@ -98,8 +90,12 @@ int ServerMetadata::GetValue(int customer_id) {
     }
 }
 
+int ServerMetadata::GetPeerSize() {
+    return neighbors.size();
+}
+
 int ServerMetadata::GetNeighborSize() {
-    return GetPrimarySockets().size();
+    return primary_sockets.size();
 }
 
 void ServerMetadata::AddNeighbors(std::shared_ptr<ServerNode> node) {
@@ -125,4 +121,58 @@ void ServerMetadata::InitNeighbors() {
 
 std::deque<std::shared_ptr<ClientSocket>> ServerMetadata::GetPrimarySockets() {
     return primary_sockets;
+}
+
+ReplicationRequest ServerMetadata::GetReplicationRequest(MapOp op) {
+    int op_code = op.opcode;
+    int op_arg1 = op.arg1;
+    int op_arg2 = op.arg2;
+    return ReplicationRequest(last_idx, committed_idx, primary_id, op_code, op_arg1, op_arg2);
+}
+
+int ServerMetadata::SendReplicationRequest(MapOp op) {
+
+	char buffer[32];
+    int size;
+
+    // get replication request object
+	ReplicationRequest request = GetReplicationRequest(op);
+	request.Marshal(buffer);
+	size = request.Size();
+
+	// iterate over all the neighbor nodes, and send the replication request
+	int total_response = 0;
+	char response_buffer[4];
+	Identifier identifier;
+
+    // synchronize sending the replication message
+	for (auto const& socket : primary_sockets) {
+
+		// if any one of the idle servers failed
+			// consider response was received
+			// continue sending it to the other idle servers
+		if (!socket->Send(buffer, size, 0)) {
+			total_response++;
+			continue;
+		}
+
+		if (socket->Recv(response_buffer, sizeof(identifier), 0)) {
+			identifier.Unmarshal(response_buffer);
+			total_response += identifier.GetIdentifier();
+		}
+	}
+
+    // corner case: less than initial peer count has joined the network in the initiation
+    total_response += GetPeerSize() - GetNeighborSize();
+
+    // debug
+    std::cout << request << std::endl;
+
+    // check if the message received matches the size of the neighbors
+	if (total_response != GetNeighborSize()) {
+		std::cout << "Some neighbor has not updated the log, so I am not executing the log!" << std::endl;
+		return 0;
+	}
+
+    return 1;
 }

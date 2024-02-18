@@ -35,7 +35,7 @@ private:
 	std::mutex erq_lock;
 	std::mutex rep_lock;
 	std::mutex stub_lock;
-	// std::mutex create_lock;
+	std::mutex meta_lock;
 
 	std::condition_variable erq_cv;
 	std::condition_variable rep_cv;

@@ -3,8 +3,6 @@
 
 #include <string>
 
-#include "ServerMetadata.h"
-
 class CustomerRequest {
 private:
 	int customer_id;
@@ -109,7 +107,7 @@ private:
 class ReplicationRequest {
 public:
 	ReplicationRequest();
-	ReplicationRequest(std::shared_ptr<ServerMetadata> metadata, MapOp op);
+	ReplicationRequest(int last_idx, int committed_idx, int primary_id, int op_code, int op_arg1, int op_arg2);
 	int Size();
 
 	int GetLastIdx();
@@ -122,13 +120,14 @@ public:
 
 	void Marshal(char *buffer);
 	void Unmarshal(char *buffer);
-
 	friend std::ostream& operator<<(std::ostream& os, const ReplicationRequest& req);
 private:
     int last_idx;
     int committed_idx;
     int primary_id;
-    MapOp op;
+    int op_code;
+	int op_arg1;
+	int op_arg2;
 };
 
 #endif // #ifndef __MESSAGES_H__
