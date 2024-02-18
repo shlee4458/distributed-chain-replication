@@ -8,6 +8,7 @@
 #define CUSTOMER_IDENTIFIER 2
 #define UPDATE_REQUEST 1
 #define READ_REQUEST 2
+#define DEBUG 1
 
 LaptopInfo LaptopFactory::
 GetLaptopInfo(CustomerRequest request, int engineer_id) {
@@ -65,9 +66,13 @@ EngineerThread(std::shared_ptr<ServerSocket> socket,
 	while (true) {
 		switch (sender) {
 			case PFA_IDENTIFIER:
-				std::cout << "I have received a message from the Primary server!" << std::endl;
+				if (DEBUG) {
+					std::cout << "I have received a message from the Primary server!" << std::endl;
+				}
 				PfaHandler(std::move(stub));
-				std::cout << "CONNECTION WITH THE SERVER HAS BEEN TERMINATED" << std::endl;
+				if (DEBUG) {
+					std::cout << "CONNECTION WITH THE SERVER HAS BEEN TERMINATED" << std::endl;
+				}
 				return;
 				break;
 			case CUSTOMER_IDENTIFIER:
@@ -133,7 +138,9 @@ void LaptopFactory::CustomerHandler(int engineer_id, std::shared_ptr<ServerStub>
 				if (!metadata->IsPrimary()) { // Idle -> Primary
 					metadata->SetPrimaryId(metadata->GetFactoryId()); // set itself as the primary
 					metadata->InitNeighbors();
-					std::cout << "I wasn't primary! Priamry Id updated!!" << std::endl;
+					if (DEBUG) {
+						std::cout << "I wasn't primary! Priamry Id updated!!" << std::endl;
+					}
 					stub->SendIdentifier(metadata->GetPrimarySockets()); // send one time identifier
 				}
 				ml.unlock();
@@ -144,7 +151,9 @@ void LaptopFactory::CustomerHandler(int engineer_id, std::shared_ptr<ServerStub>
 				// read the record, and send the record
 				laptop = GetLaptopInfo(request, engineer_id);
 				customer_id = laptop.GetCustomerId();
-				std::cout << "Received a READ REQUEST for: " << customer_id << std::endl;
+				if (DEBUG) {
+					std::cout << "Received a READ REQUEST for: " << customer_id << std::endl;
+				}
 				order_num = ReadRecord(customer_id);
 
 				// get the record to return to the client
@@ -212,7 +221,9 @@ void LaptopFactory::IdleAdminThread(int id) {
 		if (req.empty()) {
 			rep_cv.wait(rl, [this]{ return !req.empty(); });
 		}
-		std::cout << "Successfully received the replication request" << std::endl;
+		if (DEBUG) {
+			std::cout << "Successfully received the replication request" << std::endl;
+		}
 
 		auto request = std::move(req.front());
 		req.pop();
@@ -233,7 +244,9 @@ void LaptopFactory::IdleAdminThread(int id) {
 		// update the metadata; commited index, last index
 		if (was_primary) {
 			metadata->SetPrimaryId(primary_id);
-			std::cout << "I have set the primary id to: " << primary_id << std::endl;
+			if (DEBUG) {
+				std::cout << "I have set the primary id to: " << primary_id << std::endl;
+			}
 		}
 		ml.lock();
 		IdleMaintainLog(customer_id, order_num, last_idx, committed_idx, was_primary);
@@ -241,7 +254,9 @@ void LaptopFactory::IdleAdminThread(int id) {
 
 		// send to the primary that the log update is complete
 		stub->RespondToPrimary();
-		std::cout << "I have responded to the primary!" << std::endl;
+		if (DEBUG) {
+			std::cout << "I have responded to the primary!" << std::endl;
+		}
 	}
 }
 
@@ -260,7 +275,6 @@ PrimaryMaintainLog(int customer_id, int order_num, const std::shared_ptr<ServerS
 	// if it was previously an idle server, execute the last log
 	if (prev_last_idx != prev_commited_idx) {
 		metadata->ExecuteLog(prev_last_idx);
-		std::cout << "Executed Log" << std::endl;
 	}
 
 	metadata->AppendLog(op);
@@ -273,7 +287,6 @@ PrimaryMaintainLog(int customer_id, int order_num, const std::shared_ptr<ServerS
 
 	// execute log at the last index, and update the committed_index
 	metadata->ExecuteLog(metadata->GetLastIndex());
-	std::cout << "This was executed" << std::endl;
 	return;
 }
 

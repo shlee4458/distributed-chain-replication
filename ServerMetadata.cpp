@@ -3,6 +3,7 @@
 
 #include <string.h>
 #include <iostream>
+#define DEBUG 1
 
 ServerMetadata::ServerMetadata() 
 : last_idx(-1), committed_idx(-1), primary_id(-1), factory_id(-1), neighbors() { }
@@ -65,8 +66,11 @@ void ServerMetadata::ExecuteLog(int idx) {
     order_num = op.arg2;
 
     customer_record[customer_id] = order_num;
-    std::cout << "Record Updated for client: " << customer_id 
-              << " Order Num: " << order_num << std::endl;
+    if (DEBUG) {
+        std::cout << "Record Updated for client: " << customer_id 
+            << " Order Num: " << order_num << std::endl;
+    } 
+
     committed_idx++;
     return;
 }
@@ -170,7 +174,9 @@ int ServerMetadata::SendReplicationRequest(MapOp op) {
 
     // check if the message received matches the size of the neighbors
 	if (total_response != GetNeighborSize()) {
-		std::cout << "Some neighbor has not updated the log, so I am not executing the log!" << std::endl;
+        if (DEBUG) {
+            std::cout << "Some neighbor has not updated the log, so I am not executing the log!" << std::endl;
+        }
 		return 0;
 	}
 

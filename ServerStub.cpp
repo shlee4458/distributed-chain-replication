@@ -4,6 +4,7 @@
 #include <deque>
 
 #define PFA_IDENTIFIER 1
+#define DEBUG 1
 
 ServerStub::ServerStub() {}
 
@@ -73,7 +74,9 @@ int ServerStub::SendIdentifier(const std::deque<std::shared_ptr<ClientSocket>>& 
 	identifier_size = identifier->Size();
 
 	for (auto const& socket : primary_sockets) {
-		std::cout << "There is a peer" << std::endl;
+		if (DEBUG) {
+			std::cout << "There is a peer" << std::endl;
+		}
 		if (!socket->Send(identifier_buffer, identifier_size)) {
 			return 0; // failed to send an identifier to an idle server
 		}
@@ -98,7 +101,9 @@ ReplicationRequest ServerStub::ReceiveReplication() const {
 	
 	int size = request.Size();
 	if (socket->Recv(buffer, size, 0)) {
-		std::cout << "Replication Received!!!!" << std::endl;
+		if (DEBUG) {
+			std::cout << "Replication Received!!!!" << std::endl;
+		}
 		request.Unmarshal(buffer);
 	}
 	return request;
