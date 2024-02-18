@@ -8,6 +8,7 @@
 #include <vector>
 #include <thread>
 #include <map>
+#include <deque>
 
 #include "Messages.h"
 #include "ServerStub.h"
@@ -34,24 +35,23 @@ private:
 	std::mutex erq_lock;
 	std::mutex rep_lock;
 	std::mutex stub_lock;
+	// std::mutex create_lock;
 
 	std::condition_variable erq_cv;
 	std::condition_variable rep_cv;
 
 	std::shared_ptr<ServerMetadata> metadata;
-
 	std::vector<std::shared_ptr<ServerStub>> stubs;
 
 	LaptopInfo GetLaptopInfo(CustomerRequest order, int engineer_id);
 	LaptopInfo CreateLaptop(CustomerRequest order, int engineer_id, std::shared_ptr<ServerStub> stub);
+	int ReadRecord(int customer_id);
+
 	bool PfaHandler(std::shared_ptr<ServerStub> stub);
 	void CustomerHandler(int engineer_id, std::shared_ptr<ServerStub> stub);
 
-	int ReadRecord(int customer_id);
-	void PrimaryMaintainLog(int customer_id, int order_num, std::shared_ptr<ServerStub> stub);
+	void PrimaryMaintainLog(int customer_id, int order_num, const std::shared_ptr<ServerStub>& stub);
 	void IdleMaintainLog(int customer_id, int order_num, int req_last, int req_committed, bool was_primary);
-
-	void ExecuteLog(int idx);
 
 public:
 	void EngineerThread(std::shared_ptr<ServerSocket> socket, 

@@ -1,5 +1,7 @@
 #include <iomanip>
 #include <iostream>
+#include <fstream>
+#include <sstream>
 
 #include "ClientTimer.h"
 
@@ -47,6 +49,29 @@ void ClientTimer::PrintStats() {
 	std::cout << sum.count() / op_count << "\t";
 	std::cout << min.count() << "\t";
 	std::cout << max.count() << "\t";
-	std::cout << op_count / elapsed_time.count() * 1000000.0f << std::endl;
+	std::cout << op_count / elapsed_time.count() * 1000000.0f << "\t";
+	std::cout << GetMeanLatency() << std::endl;
 }
+
+float ClientTimer::GetMeanLatency() {
+	return sum.count() / op_count;
+}
+
+void ClientTimer::GenerateCSV() {
+    // open/create the file as the append mode
+    std::ofstream output("data.csv", std::ios::app);
+
+    // error handling
+    if (!output.is_open()) {
+        std::cerr << "Error opening the file." << std::endl;
+        return;
+    }
+
+    // get the data and , seperated
+    output << GetMeanLatency() << std::endl;
+    
+    // close the file
+    output.close();
+}
+
 

@@ -21,11 +21,11 @@ public:
 	int ShipLaptop(LaptopInfo info);
 	int ReturnRecord(std::shared_ptr<CustomerRecord> record);
 	void ConnectWithBackups(std::shared_ptr<ServerMetadata> metadata);
-	int SendReplicationRequest(char* buffer, int size, std::vector<std::shared_ptr<ClientSocket>> primary_sockets);
+	int SendReplicationRequest(char* buffer, int size, const std::deque<std::shared_ptr<ClientSocket>>& primary_sockets);
 
 	ReplicationRequest ReceiveReplication() const;
 	int IdentifySender() const;
-	int SendIdentifier(std::vector<std::shared_ptr<ClientSocket>> primary_sockets) const;
+	int SendIdentifier(const std::deque<std::shared_ptr<ClientSocket>>& primary_sockets) const;
 	int RespondToPrimary() const;
 };
 

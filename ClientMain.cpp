@@ -50,6 +50,7 @@ int main(int argc, char *argv[]) {
 	for (auto& cls : client_vector) {
 		timer.Merge(cls->GetTimer());	
 	}
+	timer.GenerateCSV();
 	timer.PrintStats();
 
 	return 1;

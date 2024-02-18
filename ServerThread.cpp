@@ -53,27 +53,26 @@ EngineerThread(std::shared_ptr<ServerSocket> socket,
 	// synchronize stub creation
 	int sender;
 	this->metadata = metadata;
-	auto stub = std::make_shared<ServerStub>();
+	auto stub = std::make_shared<ServerStub>(); // stub is only destroyed when the factory goes out of scope
 	stub->Init(std::move(socket));
 	sender = stub->IdentifySender();
 
 	{
 		std::unique_lock<std::mutex> sl(stub_lock);
 		stubs.push_back(stub);
-
 	}
 	
 	while (true) {
 		switch (sender) {
 			case PFA_IDENTIFIER:
 				std::cout << "I have received a message from the Primary server!" << std::endl;
-				PfaHandler(stub);
+				PfaHandler(std::move(stub));
 				std::cout << "CONNECTION WITH THE SERVER HAS BEEN TERMINATED" << std::endl;
 				return;
 				break;
 			case CUSTOMER_IDENTIFIER:
 				std::cout << "I have received a message from a customer!" << std::endl;
-				CustomerHandler(engieer_id, stub);
+				CustomerHandler(engieer_id, std::move(stub));
 				std::cout << "CONNECTION WITH THE CLIENT HAS BEEN TERMINATED" << std::endl;
 				return;
 				break;
@@ -115,6 +114,7 @@ bool LaptopFactory::PfaHandler(std::shared_ptr<ServerStub> stub) {
 }
 
 void LaptopFactory::CustomerHandler(int engineer_id, std::shared_ptr<ServerStub> stub) {
+	// std::unique_lock<std::mutex> cl(create_lock, std::defer_lock);
 	std::shared_ptr<CustomerRecord> entry;
 	CustomerRequest request;
 	LaptopInfo laptop;
@@ -168,7 +168,7 @@ ReadRecord(int customer_id) {
 void LaptopFactory::PrimaryAdminThread(int id) {
 	std::unique_lock<std::mutex> ul(erq_lock, std::defer_lock);
 	std::shared_ptr<ServerStub> stub;
-	int customer_id, order_num, stub_idx;
+	int customer_id, order_num;
 
 	while (true) {
 		ul.lock();
@@ -199,7 +199,7 @@ void LaptopFactory::IdleAdminThread(int id) {
 	std::shared_ptr<ServerStub> stub;
 
 	int last_idx, committed_idx, primary_id;
-	int customer_id, order_num, stub_idx;
+	int customer_id, order_num;
 
 	while (true) {
 		rl.lock();
@@ -244,7 +244,7 @@ void LaptopFactory::IdleAdminThread(int id) {
 }
 
 void LaptopFactory::
-PrimaryMaintainLog(int customer_id, int order_num, std::shared_ptr<ServerStub> stub) {
+PrimaryMaintainLog(int customer_id, int order_num, const std::shared_ptr<ServerStub>& stub) {
 
 	int size, neighbor_size, response_received;
 	MapOp op;
@@ -269,14 +269,11 @@ PrimaryMaintainLog(int customer_id, int order_num, std::shared_ptr<ServerStub> s
 	request.Marshal(buffer);
 	size = request.Size();
 
-	{
-		std::unique_lock<std::mutex> sl(stub_lock);
-		neighbor_size = metadata->GetNeighborSize();
-		response_received = stub->SendReplicationRequest(buffer, size, metadata->GetPrimarySockets());
-		if (response_received != neighbor_size) {
-			std::cout << "Some neighbor has not updated the log, so I am not executing the log!" << std::endl;
-			return;
-		}
+	neighbor_size = metadata->GetNeighborSize();
+	response_received = stub->SendReplicationRequest(buffer, size, metadata->GetPrimarySockets());
+	if (response_received != neighbor_size) {
+		std::cout << "Some neighbor has not updated the log, so I am not executing the log!" << std::endl;
+		return;
 	}
 	
 	std::cout << request << std::endl;

@@ -29,6 +29,8 @@ public:
 	void EndAndMerge();
 	void Merge(ClientTimer timer);
 	void PrintStats();
+	float GetMeanLatency();
+	void GenerateCSV();
 };
 
 #endif // end of #ifndef __CLIENT_TIMER_H__

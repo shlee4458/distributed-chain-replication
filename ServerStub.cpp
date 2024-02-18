@@ -1,6 +1,7 @@
 #include "ServerStub.h"
 
 #include <iostream>
+#include <deque>
 
 #define PFA_IDENTIFIER 1
 
@@ -31,7 +32,7 @@ int ServerStub::ReturnRecord(std::shared_ptr<CustomerRecord> record) {
 	return socket->Send(buffer, record->Size(), 0);
 }
 
-int ServerStub::SendReplicationRequest(char* buffer, int size, std::vector<std::shared_ptr<ClientSocket>> primary_sockets) {
+int ServerStub::SendReplicationRequest(char* buffer, int size, const std::deque<std::shared_ptr<ClientSocket>>& primary_sockets) {
 
 	// iterate over all the neighbor nodes, and send the replication request
 	int total_response = 0;
@@ -57,7 +58,7 @@ int ServerStub::SendReplicationRequest(char* buffer, int size, std::vector<std::
 	return total_response;
 }
 
-int ServerStub::SendIdentifier(std::vector<std::shared_ptr<ClientSocket>> primary_sockets) const {
+int ServerStub::SendIdentifier(const std::deque<std::shared_ptr<ClientSocket>>& primary_sockets) const {
 
 	if (primary_sockets.empty()) { // if no neighbors are present, do not send
 		return 1;

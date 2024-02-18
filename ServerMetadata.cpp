@@ -83,6 +83,7 @@ bool ServerMetadata::WasBackup() {
 }
 
 bool ServerMetadata::IsPrimary() {
+    std::unique_lock<std::mutex> ml(meta_lock);
     return primary_id == factory_id;
 }
 
@@ -122,6 +123,6 @@ void ServerMetadata::InitNeighbors() {
 	}
 }
 
-std::vector<std::shared_ptr<ClientSocket>> ServerMetadata::GetPrimarySockets() {
+std::deque<std::shared_ptr<ClientSocket>> ServerMetadata::GetPrimarySockets() {
     return primary_sockets;
 }
