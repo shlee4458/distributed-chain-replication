@@ -18,8 +18,8 @@ pw: long one
 ssh qsaasp@linux-071.khoury.northeastern.edu  10.200.125.71
 ssh qsaasp@linux-072.khoury.northeastern.edu  10.200.125.72
 ssh qsaasp@linux-073.khoury.northeastern.edu  10.200.125.73
-ssh qsaasp@linux-074.khoury.northeastern.edu  10.200.125.73
-ssh qsaasp@linux-075.khoury.northeastern.edu  10.200.125.73
+ssh qsaasp@linux-074.khoury.northeastern.edu  10.200.125.74
+ssh qsaasp@linux-075.khoury.northeastern.edu  10.200.125.75
 
 ./server 12345 0 1 1 10.200.125.72 12345
 ./server 12345 1 1 0 10.200.125.71 12345

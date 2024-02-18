@@ -4,7 +4,7 @@
 #include <deque>
 
 #define PFA_IDENTIFIER 1
-#define DEBUG 1
+#define DEBUG 0
 
 ServerStub::ServerStub() {}
 

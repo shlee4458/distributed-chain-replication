@@ -3,7 +3,7 @@
 
 #include <string.h>
 #include <iostream>
-#define DEBUG 1
+#define DEBUG 0
 
 ServerMetadata::ServerMetadata() 
 : last_idx(-1), committed_idx(-1), primary_id(-1), factory_id(-1), neighbors() { }
@@ -170,8 +170,10 @@ int ServerMetadata::SendReplicationRequest(MapOp op) {
     total_response += GetPeerSize() - GetNeighborSize();
 
     // debug
-    std::cout << request << std::endl;
-
+    if (DEBUG) {
+        std::cout << request << std::endl;
+    }
+    
     // check if the message received matches the size of the neighbors
 	if (total_response != GetNeighborSize()) {
         if (DEBUG) {

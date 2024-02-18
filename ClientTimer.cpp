@@ -49,8 +49,7 @@ void ClientTimer::PrintStats() {
 	std::cout << sum.count() / op_count << "\t";
 	std::cout << min.count() << "\t";
 	std::cout << max.count() << "\t";
-	std::cout << op_count / elapsed_time.count() * 1000000.0f << "\t";
-	std::cout << GetMeanLatency() << std::endl;
+	std::cout << op_count / elapsed_time.count() * 1000000.0f << std::endl;
 }
 
 float ClientTimer::GetMeanLatency() {

@@ -8,7 +8,7 @@
 #define CUSTOMER_IDENTIFIER 2
 #define UPDATE_REQUEST 1
 #define READ_REQUEST 2
-#define DEBUG 1
+#define DEBUG 0
 
 LaptopInfo LaptopFactory::
 GetLaptopInfo(CustomerRequest request, int engineer_id) {
@@ -76,9 +76,13 @@ EngineerThread(std::shared_ptr<ServerSocket> socket,
 				return;
 				break;
 			case CUSTOMER_IDENTIFIER:
-				std::cout << "I have received a message from a customer!" << std::endl;
+				if (DEBUG) {
+					std::cout << "I have received a message from a customer!" << std::endl;
+				}
 				CustomerHandler(engieer_id, std::move(stub));
-				std::cout << "CONNECTION WITH THE CLIENT HAS BEEN TERMINATED" << std::endl;
+				if (DEBUG) {
+					std::cout << "CONNECTION WITH THE CLIENT HAS BEEN TERMINATED" << std::endl;
+				}
 				return;
 				break;
 			default:
@@ -107,9 +111,6 @@ bool LaptopFactory::PfaHandler(std::shared_ptr<ServerStub> stub) {
 
 		idle_req->repl_request = request;
 		idle_req->stub = stub;
-		// std::promise<bool> prom;
-		// std::future<bool> fut = prom.get_future();
-		// idle_req->repl_prom = std::move(prom);
 
 		rep_lock.lock();
 		req.push(std::move(idle_req));
@@ -236,8 +237,10 @@ void LaptopFactory::IdleAdminThread(int id) {
 		customer_id = request->repl_request.GetArg1();
 		order_num = request->repl_request.GetArg2();
 		stub = request->stub;
-		std::cout << request << std::endl;
-
+		if (DEBUG) {
+			std::cout << request << std::endl;
+		}
+		
 		// check if the current server was the primary
 		bool was_primary = metadata->IsPrimary();
 
