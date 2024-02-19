@@ -10,6 +10,7 @@
 - [Class Structure](#class-structure)
 - [Implementation](#implementation)
 - [Evaluation](#evaluation)
+- [Further Works](#further-works)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 <br>
@@ -64,7 +65,7 @@ No external libraries other than C++11 Standard Library was used for the program
 
     # from node3 run;
     ./server 12345 2 2 0 10.200.125.71 12345 1 10.200.125.72 12345
-    
+
     # from node4 run;
     ./client 10.200.125.71 12345 4 40000 1
 
@@ -136,6 +137,7 @@ The experiment was conducted to understand performance changes based on the numb
 <br>
 
 Increase in the number of servers resulted in higher latency. We can visualize the trade off of reliability and latency through replicated servers.
+<br>
 
 # Further works
 The program assumes that all the messages from primary server is sent to back up nodes sequentially based on the TCP protocol. It would be interesting to modify logic to allow handling message sent through UDP protocol. It would also be interesting if we can also allow primary server to send the repair message to the backup nodes when the server comes back up while the clients are sending the message to the primary node, and when the primary and backup nodes are constantly changing.
