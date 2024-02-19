@@ -108,6 +108,7 @@ class ReplicationRequest {
 public:
 	ReplicationRequest();
 	ReplicationRequest(int last_idx, int committed_idx, int primary_id, int op_code, int op_arg1, int op_arg2);
+	void SetRepairRequest(int last_idx, int committed_idx, int primary_id);
 	int Size();
 
 	int GetLastIdx();

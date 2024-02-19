@@ -10,7 +10,6 @@
 - [Class Structure](#class-structure)
 - [Implementation](#implementation)
 - [Evaluation](#evaluation)
-- [Improvements](#improvements)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 <br>
@@ -90,44 +89,32 @@ Common
 
 # Implementation
 
-## Communication between server and client
+## Primary-Backup Server logic
+<i>Note: Primary server - Servers that receive the write request from the customer and handles the request. / Backup server - Servers that receive the replication request. </i>
 
-## Serialization and Deserialization
+Step 1: Client have 2 options for the requests; write request(type 1), read request(type 2: without debug message, type 3: with debug message). A server can receive request from both client and the primary server(replication request). Once a server receives a request from the customer, it will identify whether it is replication request or the customer request through unmarshalling one-time identifier sent by either primary server(identifier: 1) or the customer(identifier: 0). Each identifier will route the request to the PfaHandler and CustomerHandler, respectively.
 
-## Synchronization(ID generation, Thread pool queueing)
+Step 2 - handle replication request from primary server: PfaHandler in the backup server will wait to receive a replication request sent from the primary server. The replicatioin request includes last_index where the Map Operation object should be inserted in the log object that stores historic map operations, last committed_index from the primary server, and customer id and order number for the simple key value mapping. Once the information is unmarshalled, the backup server responds to the primary server with the acknowledge message containing 1. Primary server will process all the acknowledge messages that it has received by adding up all the message values, and only when all the backup servers have responded with the acknowledge message, it executed the map operation added at the current loop. 
+
+Step 2 - handle customer request from client: CustomerHandler in both backup server and the primary server will wait to receive a customer request object. If it is a read request, the server communicates directly to the customer with local customer order information stored in the map object. If the order is a write request and the server was a primary server, it sends replication request to the backup servers. However, when the server was a backup server, it will adjust itself to the primary server by establishing a connection with other servers and updating the primary id stored in the metadata object.
+
+Step 3 - If either primary server or client fails while sending the requests, the backup server gracefully exits out from the handler loops, and wait for the connection request from either client or server.
+
+## Design choices for ownership of objects 
+I decided to store the server information like factory id, primary id along with customer record related information in the metadata class. For simplicity, I included communication logic between servers -- replication request -- within the metadata class. Metadata object is a singleton object that stays within the LaptopFactory object.
+
+LaptopFactory object also has an ownership of all the sockets that are open through a deque of shared_ptr of the stubs. Storing the stub object that has ServerSocket into a container was necessary to prevent server losing access to the ServerSocket object when the blocking socket recv function is called when the stub object goes out of scope and gets destroyed.
 
 
 <br>
 
 # Evaluation
-## Experiments
-4 experiments were conducted to understand performance of the program. Each experiment was conducted 3 times. 4 client threads were used for 40,000 write orders per customer.
-
-## Table
-<i>Unit: latency - microseconds</i>
-#### Experiment 1
-<img alt="Experiment 1 Table" title="Experiment 1 Table" src="img/table1.png" width="500">
-<br>
-
-### Experiment 2
-<img alt="Experiment 2 Table" title="Experiment 2 Table" src="img/table2.png" width="500">
-<br>
-
-### Experiment 3
-<img alt="Experiment 3 Table" title="Experiment 3 Table" src="img/table3.png" width="500">
-<br>
-
-### Experiment 4
-<img alt="Experiment 4 Table" title="Experiment 4 Table" src="img/table4.png" width="500">
-<br>
-
-
+The experiment was conducted to understand performance changes based on the number of servers. Each experiment was conducted 3 times to smooth out the affect of external factors. 4 client threads were used for 40,000 write orders per customer.
 
 ## Latency Graph
-### Experiment 1
-<img alt="Experiment 1 Lat-Graph" title="Experiment 1 Lat-Graph" src="img/latency_graph1.png" width="500">
+<i>Unit: latency - microseconds</i>
+### Experiment
+<img alt="Experiment 1 Table" title="Experiment 1 Table" src="img/latency_graph.png" width="500">
 <br>
-This is the experiment where the order did not include custom laptop. When number of customer value was small, the experiment have experienced sudden spike in the maximum latency. Max latency were generally higher than the cases where custom orders were made. We may hypothesis that certain delay in sending the data from server to client increases leveling the latency.
 
-
-# Improvements
+Increase in the number of servers resulted in higher latency. We can visualize the trade off of reliability and latency through replicated servers.

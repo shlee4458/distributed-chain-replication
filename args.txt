@@ -52,11 +52,9 @@ scp -r ./hw1 qsaasp@login.khoury.northeastern.edu:
 ./server 12345 0 1 1 10.200.125.72 12345
 ./server 12345 1 1 0 10.200.125.71 12345
 
-./server 12345 0 4 1 10.200.125.72 12345
+./server 12345 0 1 1 10.200.125.72 12345
 
 
 ./server 12345 1 0 1 10.200.125.71 12345
-
-
 
 scp -r ./laptop_factory_src/ qsaasp@login.khoury.northeastern.edu:

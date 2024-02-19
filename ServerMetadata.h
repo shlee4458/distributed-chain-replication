@@ -35,6 +35,8 @@ private:
     std::map<int, int> customer_record;
     std::vector<MapOp> smr_log;
     std::mutex meta_lock;
+    std::deque<std::shared_ptr<ServerNode>> failed_neighbors; // store the ServerNodes that are not open
+    std::map<std::shared_ptr<ClientSocket>, std::shared_ptr<ServerNode>> socket_node;
 
 public:
     ServerMetadata();
@@ -45,9 +47,12 @@ public:
     int GetCommittedIndex();
     int GetNeighborSize();
     int GetPeerSize();
+    std::vector<MapOp> GetLog();
+    MapOp GetOp(int idx);
     std::vector<std::shared_ptr<ServerNode>> GetNeighbors();
     std::deque<std::shared_ptr<ClientSocket>> GetPrimarySockets();
-    MapOp GetOp(int idx);
+    std::deque<std::shared_ptr<ServerNode>> GetFailedNeighbors();
+    int GetValue(int customer_id);
     ReplicationRequest GetReplicationRequest(MapOp op);
 
     void SetFactoryId(int id);
@@ -56,14 +61,17 @@ public:
     void UpdateCommitedIndex(int idx);
     void AppendLog(MapOp op);
     void ExecuteLog(int idx);
-    int GetValue(int customer_id);
+    
 
     bool WasBackup();
     bool IsPrimary();
 
     void AddNeighbors(std::shared_ptr<ServerNode> node);
     void InitNeighbors();
+    void RepairFailedServers();
     int SendReplicationRequest(MapOp op);
+    int Repair(std::shared_ptr<ClientSocket> socket);
+    int SendIdentifier(std::shared_ptr<ClientSocket> socket);
 };
 
 #endif

@@ -261,6 +261,12 @@ ReplicationRequest::ReplicationRequest(int last_idx, int committed_idx, int prim
 	this->op_arg2 = op_arg2;
 }
 
+void ReplicationRequest::SetRepairRequest(int last_idx, int committed_idx, int primary_id) {
+    this->last_idx = last_idx;
+    this->committed_idx = committed_idx;
+    this->primary_id = primary_id;
+}
+
 int ReplicationRequest::Size() {
 	return sizeof(last_idx) + sizeof(committed_idx) + sizeof(primary_id) 
 	+ sizeof(op_code) + sizeof(op_arg1) + sizeof(op_arg2);

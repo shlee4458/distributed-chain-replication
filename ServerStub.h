@@ -25,7 +25,6 @@ public:
 
 	ReplicationRequest ReceiveReplication() const;
 	int IdentifySender() const;
-	int SendIdentifier(const std::deque<std::shared_ptr<ClientSocket>>& primary_sockets) const;
 	int RespondToPrimary() const;
 };
 

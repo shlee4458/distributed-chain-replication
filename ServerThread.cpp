@@ -8,7 +8,8 @@
 #define CUSTOMER_IDENTIFIER 2
 #define UPDATE_REQUEST 1
 #define READ_REQUEST 2
-#define DEBUG 0
+#define DEBUG 1
+#define REPAIR 1
 
 LaptopInfo LaptopFactory::
 GetLaptopInfo(CustomerRequest request, int engineer_id) {
@@ -126,6 +127,15 @@ void LaptopFactory::CustomerHandler(int engineer_id, std::shared_ptr<ServerStub>
 	LaptopInfo laptop;
 	int request_type, customer_id, order_num;
 
+
+	// if current is primary server, 
+		// upon receiving the customer update request, repair the failed servers
+	if (metadata->IsPrimary()) {
+		if (REPAIR) {
+			metadata->RepairFailedServers();
+		}
+	}
+
 	while (true) {
 		
 		request = stub->ReceiveRequest();
@@ -138,12 +148,13 @@ void LaptopFactory::CustomerHandler(int engineer_id, std::shared_ptr<ServerStub>
 				ml.lock();
 				if (!metadata->IsPrimary()) { // Idle -> Primary
 					metadata->SetPrimaryId(metadata->GetFactoryId()); // set itself as the primary
-					metadata->InitNeighbors();
+					metadata->InitNeighbors(); // create connection and send identifier
 					if (DEBUG) {
 						std::cout << "I wasn't primary! Priamry Id updated!!" << std::endl;
 					}
-					stub->SendIdentifier(metadata->GetPrimarySockets()); // send one time identifier
+					// stub->SendIdentifier(metadata->GetPrimarySockets()); // send one time identifier
 				}
+
 				ml.unlock();
 				laptop = CreateLaptop(request, engineer_id, stub);
 				stub->ShipLaptop(laptop);

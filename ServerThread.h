@@ -59,6 +59,7 @@ public:
 						std::shared_ptr<ServerMetadata> metadata);
 	void PrimaryAdminThread(int id);
 	void IdleAdminThread(int id);
+	void HeartBeatThread();
 };
 
 #endif // end of #ifndef __SERVERTHREAD_H__

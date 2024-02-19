@@ -3,8 +3,8 @@
 #include <iostream>
 #include <deque>
 
-#define PFA_IDENTIFIER 1
-#define DEBUG 0
+#define ACK 1
+#define DEBUG 1
 
 ServerStub::ServerStub() {}
 
@@ -59,31 +59,6 @@ int ServerStub::SendReplicationRequest(char* buffer, int size, const std::deque<
 	return total_response;
 }
 
-int ServerStub::SendIdentifier(const std::deque<std::shared_ptr<ClientSocket>>& primary_sockets) const {
-
-	if (primary_sockets.empty()) { // if no neighbors are present, do not send
-		return 1;
-	}
-
-	// send identifier to the idle server
-	char identifier_buffer[4];
-	int identifier_size;
-	auto identifier = std::shared_ptr<Identifier>(new Identifier());
-	identifier->SetIdentifier(PFA_IDENTIFIER);
-	identifier->Marshal(identifier_buffer); // store the identifier value in the buffer
-	identifier_size = identifier->Size();
-
-	for (auto const& socket : primary_sockets) {
-		if (DEBUG) {
-			std::cout << "There is a peer" << std::endl;
-		}
-		if (!socket->Send(identifier_buffer, identifier_size)) {
-			return 0; // failed to send an identifier to an idle server
-		}
-	}
-	return 1;
-}
-
 int ServerStub::IdentifySender() const {
 	// return 1 if it is pfa, 2 if it is customer
 	char buffer[4];
@@ -109,12 +84,11 @@ ReplicationRequest ServerStub::ReceiveReplication() const {
 	return request;
 }
 
-
 int ServerStub::RespondToPrimary() const {
 	char buffer[4];
 	Identifier identifier;
 	int size = identifier.Size();
-	identifier.SetIdentifier(PFA_IDENTIFIER);
+	identifier.SetIdentifier(ACK);
 	identifier.Marshal(buffer);
 	return socket->Send(buffer, size, 0);
 }
