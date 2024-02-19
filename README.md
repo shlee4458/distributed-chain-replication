@@ -138,6 +138,7 @@ The experiment was conducted to understand performance changes based on the numb
 <br>
 
 Increase in the number of servers resulted in higher latency. We can visualize the trade off of reliability and latency through replicated servers.
+
 <br>
 
 # Further works
