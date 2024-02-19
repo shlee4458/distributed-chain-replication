@@ -23,7 +23,6 @@ struct PrimaryAdminRequest {
 
 struct IdleAdminRequest {
 	ReplicationRequest repl_request;
-	// std::promise<bool> repl_prom;
 	std::shared_ptr<ServerStub> stub;
 };
 
@@ -59,7 +58,6 @@ public:
 						std::shared_ptr<ServerMetadata> metadata);
 	void PrimaryAdminThread(int id);
 	void IdleAdminThread(int id);
-	void HeartBeatThread();
 };
 
 #endif // end of #ifndef __SERVERTHREAD_H__

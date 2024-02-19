@@ -6,7 +6,6 @@
 #include "ServerSocket.h"
 #include "ClientSocket.h"
 #include "Messages.h"
-#include "ServerMetadata.h"
 
 class ServerStub {
 private:
@@ -20,8 +19,6 @@ public:
 	CustomerRequest ReceiveRequest();
 	int ShipLaptop(LaptopInfo info);
 	int ReturnRecord(std::shared_ptr<CustomerRecord> record);
-	void ConnectWithBackups(std::shared_ptr<ServerMetadata> metadata);
-	int SendReplicationRequest(char* buffer, int size, const std::deque<std::shared_ptr<ClientSocket>>& primary_sockets);
 
 	ReplicationRequest ReceiveReplication() const;
 	int IdentifySender() const;

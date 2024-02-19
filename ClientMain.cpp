@@ -9,6 +9,8 @@
 #include "ClientThread.h"
 #include "ClientTimer.h"
 
+#define LOG 0
+
 int main(int argc, char *argv[]) {
 	std::string ip;
 	int port;
@@ -50,7 +52,9 @@ int main(int argc, char *argv[]) {
 	for (auto& cls : client_vector) {
 		timer.Merge(cls->GetTimer());	
 	}
-	timer.GenerateCSV();
+	if (LOG) {
+		timer.GenerateCSV();
+	}
 	timer.PrintStats();
 
 	return 1;

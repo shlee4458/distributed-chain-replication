@@ -17,5 +17,4 @@ public:
 	int SendIdentifier(Identifier identifier);
 };
 
-
 #endif // end of #ifndef __CLIENT_STUB_H__

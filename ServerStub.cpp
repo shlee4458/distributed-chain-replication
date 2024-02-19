@@ -4,7 +4,7 @@
 #include <deque>
 
 #define ACK 1
-#define DEBUG 1
+#define DEBUG 0
 
 ServerStub::ServerStub() {}
 
@@ -31,32 +31,6 @@ int ServerStub::ReturnRecord(std::shared_ptr<CustomerRecord> record) {
 	char buffer[32];
 	record->Marshal(buffer);
 	return socket->Send(buffer, record->Size(), 0);
-}
-
-int ServerStub::SendReplicationRequest(char* buffer, int size, const std::deque<std::shared_ptr<ClientSocket>>& primary_sockets) {
-
-	// iterate over all the neighbor nodes, and send the replication request
-	int total_response = 0;
-	char response_buffer[4];
-	Identifier identifier;
-
-	for (auto const& socket : primary_sockets) {
-
-		// if any one of the idle servers failed
-			// consider response was received
-			// continue sending it to the other idle servers
-		if (!socket->Send(buffer, size, 0)) {
-			total_response++;
-			continue;
-		}
-
-		if (socket->Recv(response_buffer, sizeof(identifier), 0)) {
-			identifier.Unmarshal(response_buffer);
-			total_response += identifier.GetIdentifier();
-		}
-
-	}
-	return total_response;
 }
 
 int ServerStub::IdentifySender() const {

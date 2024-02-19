@@ -60,16 +60,11 @@ void ClientTimer::GenerateCSV() {
     // open/create the file as the append mode
     std::ofstream output("data.csv", std::ios::app);
 
-    // error handling
     if (!output.is_open()) {
         std::cerr << "Error opening the file." << std::endl;
         return;
     }
-
-    // get the data and , seperated
     output << GetMeanLatency() << std::endl;
-    
-    // close the file
     output.close();
 }
 

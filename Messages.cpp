@@ -92,6 +92,7 @@ void LaptopInfo::CopyRequest(CustomerRequest order) {
 	order_number = order.GetOrderNumber();
 	request_type = order.GetRequestType();
 }
+
 void LaptopInfo::SetEngineerId(int id) { engineer_id = id; }
 void LaptopInfo::SetAdminId(int id) { admin_id = id; }
 

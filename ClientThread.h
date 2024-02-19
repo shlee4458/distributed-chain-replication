@@ -22,5 +22,4 @@ public:
 	ClientTimer GetTimer();
 };
 
-
 #endif // end of #ifndef __CLIENT_THREAD_H__

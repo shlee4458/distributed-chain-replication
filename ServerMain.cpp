@@ -1,4 +1,3 @@
-#include <chrono>
 #include <iostream>
 #include <mutex>
 #include <thread>
@@ -28,6 +27,11 @@ int main(int argc, char *argv[]) {
 	unique_id = atoi(argv[2]);
 	num_peers = atoi(argv[3]);
 	std::cout << "num_peers: " << num_peers << std::endl;
+
+	if ((argc - 4) / 3 != num_peers) {
+		std::cout << "not enough peer information has been provided!" << std::endl;
+		return 0;
+	}
 
 	// update the server metadata
 	auto metadata = std::make_shared<ServerMetadata>();
@@ -62,7 +66,6 @@ int main(int argc, char *argv[]) {
 		std::cout << "I have received the connection request from the primary" << std::endl;
 		std::thread engineer_thread(&LaptopFactory::EngineerThread, &factory, 
 				std::move(new_socket), engineer_cnt++, metadata);
-			// engineer_thread.detach();
 		thread_vector.push_back(std::move(engineer_thread));
 	}
 	return 0;

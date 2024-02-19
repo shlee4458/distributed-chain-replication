@@ -34,7 +34,6 @@ private:
     std::deque<std::shared_ptr<ClientSocket>> primary_sockets; // socket to the backup nodes as a primary
     std::map<int, int> customer_record;
     std::vector<MapOp> smr_log;
-    std::mutex meta_lock;
     std::deque<std::shared_ptr<ServerNode>> failed_neighbors; // store the ServerNodes that are not open
     std::map<std::shared_ptr<ClientSocket>, std::shared_ptr<ServerNode>> socket_node;
 
@@ -45,7 +44,6 @@ public:
     int GetFactoryId();
     int GetLastIndex();
     int GetCommittedIndex();
-    int GetNeighborSize();
     int GetPeerSize();
     std::vector<MapOp> GetLog();
     MapOp GetOp(int idx);

@@ -4,7 +4,7 @@
 #include <string.h>
 #include <iostream>
 #define PFA_IDENTIFIER 1
-#define DEBUG 1
+#define DEBUG 0
 
 ServerMetadata::ServerMetadata() 
 : last_idx(-1), committed_idx(-1), primary_id(-1), factory_id(-1), neighbors() { }
@@ -33,10 +33,6 @@ int ServerMetadata::GetPeerSize() {
     return neighbors.size();
 }
 
-int ServerMetadata::GetNeighborSize() {
-    return primary_sockets.size();
-}
-
 std::deque<std::shared_ptr<ServerNode>> ServerMetadata::GetFailedNeighbors() {
     return failed_neighbors;
 }
@@ -49,8 +45,11 @@ std::vector<MapOp> ServerMetadata::GetLog() {
     return smr_log;
 }
 
+MapOp ServerMetadata::GetOp(int idx) {
+    return smr_log[idx];
+}
+
 int ServerMetadata::GetValue(int customer_id) {
-    std::unique_lock<std::mutex> ml(meta_lock);
     auto it = customer_record.find(customer_id);
     if (it != customer_record.end()) { // found the key, return the value
         return customer_record[customer_id];
@@ -93,10 +92,6 @@ void ServerMetadata::AppendLog(MapOp op) {
     return;
 }
 
-MapOp ServerMetadata::GetOp(int idx) {
-    return smr_log[idx];
-}
-
 void ServerMetadata::ExecuteLog(int idx) {
     int customer_id, order_num;
     
@@ -127,7 +122,7 @@ void ServerMetadata::AddNeighbors(std::shared_ptr<ServerNode> node) {
 
 void ServerMetadata::InitNeighbors() {
 
-    // case primary -> idle -> primary; empty the sockets and failed
+    // corner case: primary -> idle -> primary; empty the sockets and failed
     primary_sockets.clear();
     failed_neighbors.clear();
 
@@ -178,20 +173,19 @@ int ServerMetadata::SendReplicationRequest(MapOp op) {
 	request.Marshal(buffer);
 	size = request.Size();
 
-	// iterate over all the neighbor nodes, and send the replication request
 	int total_response = failed_neighbors.size();
 	char response_buffer[4];
 	Identifier identifier;
-
-    // synchronize sending the replication message
     std::deque<std::shared_ptr<ClientSocket>> new_primary_sockets;
+
+    // iterate over all the neighbor nodes, and send the replication request
 	for (auto const& socket : primary_sockets) {
 
 		// if any one of the idle servers failed
 			// consider response was received
 			// continue sending it to the other idle servers
-		if (!socket->Send(buffer, size, 0)) {
             // update the failed_neighbor to include the current failed server node
+		if (!socket->Send(buffer, size, 0)) {
             failed_neighbors.push_back(socket_node[socket]);
 			total_response++;
 			continue;
@@ -203,12 +197,9 @@ int ServerMetadata::SendReplicationRequest(MapOp op) {
 		}
         new_primary_sockets.push_back(socket);
 	}
-    primary_sockets = new_primary_sockets; // update with the sockets excluding failed sockets
 
-    // corner case: less than initial peer count has joined the network in the initiation
-    // total_response += GetPeerSize() - GetNeighborSize();
-
-    // debug
+    // update with the sockets excluding failed sockets
+    primary_sockets = new_primary_sockets; 
     if (DEBUG) {
         std::cout << request << std::endl;
     }
@@ -226,6 +217,7 @@ int ServerMetadata::SendReplicationRequest(MapOp op) {
 }
 
 void ServerMetadata::RepairFailedServers() {
+
 	std::string ip;
 	int port;
     std::deque<std::shared_ptr<ServerNode>> new_failed;
@@ -236,9 +228,7 @@ void ServerMetadata::RepairFailedServers() {
 		std::shared_ptr<ClientSocket> socket = std::make_shared<ClientSocket>();
 		if (socket->Init(ip, port)) { // if the failed server came back on
             std::cout << "Came back on!" << std::endl;
-            // send identifier
             SendIdentifier(socket);
-
             if (!Repair(socket)) { // repair was unsuccessful
                 new_failed.push_back(node);
                 continue;
@@ -254,7 +244,6 @@ void ServerMetadata::RepairFailedServers() {
 int ServerMetadata::Repair(std::shared_ptr<ClientSocket> socket) {
 
     // send all the mapops stored in the smr_log
-    std::unique_lock<std::mutex> ml(meta_lock, std::defer_lock);
 	char buffer[32];
     int size;
     ReplicationRequest request;
@@ -265,15 +254,13 @@ int ServerMetadata::Repair(std::shared_ptr<ClientSocket> socket) {
     std::cout << "repairing!" << std::endl;
     // get replication request object
     for (auto i = 0u; i < smr_log.size(); i++) {
-        std::cout << "repairing for all the logs:" << i << std::endl;
         op = smr_log[i];
         request = GetReplicationRequest(op);
         request.SetRepairRequest(i, i - 1, primary_id);
         request.Marshal(buffer);
         size = request.Size();        
 
-		if (!socket->Send(buffer, size, 0)) {
-            // repair was not successful
+		if (!socket->Send(buffer, size, 0)) { // repair was not successful
 			return 0;
 		}
 
@@ -282,5 +269,5 @@ int ServerMetadata::Repair(std::shared_ptr<ClientSocket> socket) {
 			identifier.Unmarshal(response_buffer);
 		}
     }
-    return 1; // successful repiar
+    return 1; // successful repair
 }

@@ -8,7 +8,8 @@
 #define CUSTOMER_IDENTIFIER 2
 #define UPDATE_REQUEST 1
 #define READ_REQUEST 2
-#define DEBUG 1
+
+#define DEBUG 0
 #define REPAIR 1
 
 LaptopInfo LaptopFactory::
@@ -52,7 +53,6 @@ EngineerThread(std::shared_ptr<ServerSocket> socket,
 				int engieer_id, 
 				std::shared_ptr<ServerMetadata> metadata) {
 	
-	// synchronize stub creation
 	int sender;
 	this->metadata = metadata;
 	auto stub = std::make_shared<ServerStub>(); // stub is only destroyed when the factory goes out of scope
@@ -109,7 +109,6 @@ bool LaptopFactory::PfaHandler(std::shared_ptr<ServerStub> stub) {
 		std::shared_ptr<IdleAdminRequest> idle_req = 
 			std::shared_ptr<IdleAdminRequest>(new IdleAdminRequest);
 
-
 		idle_req->repl_request = request;
 		idle_req->stub = stub;
 
@@ -121,30 +120,31 @@ bool LaptopFactory::PfaHandler(std::shared_ptr<ServerStub> stub) {
 }
 
 void LaptopFactory::CustomerHandler(int engineer_id, std::shared_ptr<ServerStub> stub) {
+
 	std::unique_lock<std::mutex> ml(meta_lock, std::defer_lock);
 	std::shared_ptr<CustomerRecord> entry;
 	CustomerRequest request;
 	LaptopInfo laptop;
 	int request_type, customer_id, order_num;
 
-
 	// if current is primary server, 
 		// upon receiving the customer update request, repair the failed servers
+	ml.lock();
 	if (metadata->IsPrimary()) {
 		if (REPAIR) {
 			metadata->RepairFailedServers();
 		}
 	}
+	ml.unlock();
 
 	while (true) {
-		
 		request = stub->ReceiveRequest();
 		if (!request.IsValid()) {
 			return;
 		}
 		request_type = request.GetRequestType();
 		switch (request_type) {
-			case UPDATE_REQUEST: // Update logic: PFA only
+			case UPDATE_REQUEST: // PFA only
 				ml.lock();
 				if (!metadata->IsPrimary()) { // Idle -> Primary
 					metadata->SetPrimaryId(metadata->GetFactoryId()); // set itself as the primary
@@ -152,23 +152,18 @@ void LaptopFactory::CustomerHandler(int engineer_id, std::shared_ptr<ServerStub>
 					if (DEBUG) {
 						std::cout << "I wasn't primary! Priamry Id updated!!" << std::endl;
 					}
-					// stub->SendIdentifier(metadata->GetPrimarySockets()); // send one time identifier
 				}
-
 				ml.unlock();
 				laptop = CreateLaptop(request, engineer_id, stub);
 				stub->ShipLaptop(laptop);
 				break;
-			case READ_REQUEST: // Read logic: both PFA, IFA
-				// read the record, and send the record
+			case READ_REQUEST: // both PFA, IFA
 				laptop = GetLaptopInfo(request, engineer_id);
 				customer_id = laptop.GetCustomerId();
 				if (DEBUG) {
 					std::cout << "Received a READ REQUEST for: " << customer_id << std::endl;
 				}
 				order_num = ReadRecord(customer_id);
-
-				// get the record to return to the client
 				entry = std::shared_ptr<CustomerRecord>(new CustomerRecord());
 				entry->SetRecord(customer_id, order_num);
 				entry->Print();
@@ -196,11 +191,9 @@ void LaptopFactory::PrimaryAdminThread(int id) {
 
 	while (true) {
 		ul.lock();
-
 		if (erq.empty()) {
 			erq_cv.wait(ul, [this]{ return !erq.empty(); });
 		}
-
 		auto req = std::move(erq.front());
 		erq.pop();
 		ul.unlock();
@@ -213,6 +206,7 @@ void LaptopFactory::PrimaryAdminThread(int id) {
 		// update the record and set the adminid
 		req->laptop.SetAdminId(id);
 		req->prom.set_value(req->laptop);
+
 		ml.lock();
 		PrimaryMaintainLog(customer_id, order_num, stub); 
 		ml.unlock();
@@ -229,14 +223,12 @@ void LaptopFactory::IdleAdminThread(int id) {
 
 	while (true) {
 		rl.lock();
-
 		if (req.empty()) {
 			rep_cv.wait(rl, [this]{ return !req.empty(); });
 		}
 		if (DEBUG) {
 			std::cout << "Successfully received the replication request" << std::endl;
 		}
-
 		auto request = std::move(req.front());
 		req.pop();
 		rl.unlock();
@@ -278,7 +270,6 @@ void LaptopFactory::
 PrimaryMaintainLog(int customer_id, int order_num, const std::shared_ptr<ServerStub>& stub) {
 	
 	int response_received, prev_last_idx, prev_commited_idx;
-
 	MapOp op;
 	op.opcode = 1;
 	op.arg1 = customer_id;
@@ -306,6 +297,7 @@ PrimaryMaintainLog(int customer_id, int order_num, const std::shared_ptr<ServerS
 
 void LaptopFactory::
 IdleMaintainLog(int customer_id, int order_num, int req_last, int req_committed, bool was_primary) {
+
 	MapOp op;
 	op.opcode = 1;
 	op.arg1 = customer_id;
@@ -314,9 +306,8 @@ IdleMaintainLog(int customer_id, int order_num, int req_last, int req_committed,
 	// append the new log and update the last_index
 	metadata->AppendLog(op);
 
-	// execute the log at the req.committed index
-	// it is not the case that the server was primary
-	if (req_committed >= 0 && !was_primary) { // need at least 1 MapOp to be present
+	// if it is not the case that the server was primary or no mapop is found
+	if (req_committed >= 0 && !was_primary) {
 		metadata->ExecuteLog(req_committed);
 	}
 }
