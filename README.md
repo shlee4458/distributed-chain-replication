@@ -135,7 +135,6 @@ The experiment was conducted to understand performance changes based on the numb
 <i>Unit: latency - microseconds</i>
 ### Experiment
 <img alt="Experiment 1 Table" title="Experiment 1 Table" src="img/latency_graph.png" width="500">
-<br>
 
 Increase in the number of servers resulted in higher latency. We can visualize the trade off of reliability and latency through replicated servers.
 
